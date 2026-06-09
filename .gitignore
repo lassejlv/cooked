@@ -1,0 +1,17 @@
+# rust
+/target
+**/*.rs.bk
+
+# node
+node_modules
+dist
+.turbo
+
+# napi build artifacts
+*.node
+crates/cooked_napi/index.js
+crates/cooked_napi/index.d.ts
+
+# misc
+.DS_Store
+*.log

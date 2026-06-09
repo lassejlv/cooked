@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+members = ["crates/cooked_compiler", "crates/cooked_napi"]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/cooked-lang/cooked"
+
+[workspace.dependencies]
+cooked_compiler = { path = "crates/cooked_compiler" }
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = "symbols"

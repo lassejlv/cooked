@@ -1,0 +1,21 @@
+{
+  "name": "@cooked/example-counter",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "cooked": "workspace:*"
+  },
+  "devDependencies": {
+    "happy-dom": "^15.11.6",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3",
+    "vite-plugin-cooked": "workspace:*",
+    "vitest": "^2.1.8"
+  }
+}

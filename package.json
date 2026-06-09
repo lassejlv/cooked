@@ -1,0 +1,18 @@
+{
+  "name": "cooked-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Cooked — a Svelte/Solid-style compiled UI language. Rust x TypeScript.",
+  "type": "module",
+  "scripts": {
+    "build:compiler": "pnpm --filter @cooked/binding build",
+    "build:runtime": "pnpm --filter cooked build",
+    "build": "pnpm build:runtime && pnpm build:compiler",
+    "test": "pnpm -r test",
+    "example": "pnpm --filter @cooked/example-counter dev"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  },
+  "packageManager": "pnpm@11.5.2"
+}

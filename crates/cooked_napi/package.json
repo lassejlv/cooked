@@ -1,0 +1,21 @@
+{
+  "name": "@cooked/binding",
+  "version": "0.0.1",
+  "description": "Native Cooked compiler bindings (napi-rs).",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "napi": {
+    "name": "cooked-binding",
+    "triples": {
+      "defaults": true
+    }
+  },
+  "files": ["index.js", "index.d.ts", "*.node"],
+  "scripts": {
+    "build": "napi build --platform --release",
+    "build:debug": "napi build --platform"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^2.18.4"
+  }
+}

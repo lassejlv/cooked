@@ -65,11 +65,16 @@ cargo run -p cooked_lsp --bin cooked-lsp
 ```
 
 The server supports `.ck` document sync, compiler diagnostics, completion,
-hover, document symbols, definition lookup, TypeScript/JavaScript-oriented
-member completions, and CSS property completions inside `style={{ ... }}`.
+hover, document symbols, definition lookup, TypeScript compiler-service
+completion/hover/diagnostics, and CSS property completions inside
+`style={{ ... }}`.
+
+See [Language server](./language-server.md) for editor wiring and the
+TypeScript service bridge.
 
 ## Related docs
 
 - [Getting started](./getting-started.md)
 - [Language guide](./language.md)
+- [Language server](./language-server.md)
 - [Development](./development.md)

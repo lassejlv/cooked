@@ -1,7 +1,13 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
+use serde::{Deserialize, Serialize};
+use tokio::io::AsyncWriteExt;
+use tokio::process::Command;
 use tokio::sync::RwLock;
+use tokio::time::timeout;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
@@ -114,7 +120,11 @@ impl LanguageServer for Backend {
             return Ok(None);
         };
 
-        let items = completion_items(&text, pos);
+        let mut items = completion_items(&text, pos);
+        if !in_style_object(&text, pos) {
+            items.extend(typescript_completions(&uri, &text, pos).await);
+            dedupe_completion_items(&mut items);
+        }
         Ok(Some(CompletionResponse::Array(items)))
     }
 
@@ -124,11 +134,12 @@ impl LanguageServer for Backend {
         let Some(text) = self.documents.get(&uri).await else {
             return Ok(None);
         };
-        let Some(word) = word_at(&text, pos) else {
-            return Ok(None);
-        };
-        let Some(markdown) = hover_text(&word) else {
-            return Ok(None);
+        let markdown = match word_at(&text, pos).and_then(|word| hover_text(&word)) {
+            Some(markdown) => markdown,
+            None => match typescript_hover(&uri, &text, pos).await {
+                Some(markdown) => markdown,
+                None => return Ok(None),
+            },
         };
 
         Ok(Some(Hover {
@@ -164,8 +175,12 @@ impl LanguageServer for Backend {
         let Some(word) = word_at(&text, pos) else {
             return Ok(None);
         };
-        let Some(range) = definition_range(&text, &word) else {
-            return Ok(None);
+        let range = match definition_range(&text, &word) {
+            Some(range) => range,
+            None => match typescript_definition(&uri, &text, pos).await {
+                Some(range) => range,
+                None => return Ok(None),
+            },
         };
         Ok(Some(GotoDefinitionResponse::Scalar(Location::new(
             uri, range,
@@ -178,7 +193,7 @@ impl LanguageServer for Backend {
     ) -> Result<DocumentDiagnosticReportResult> {
         let uri = params.text_document.uri;
         let diagnostics = match self.documents.get(&uri).await {
-            Some(text) => diagnostics_for(&uri, &text),
+            Some(text) => document_diagnostics_for(&uri, &text).await,
             None => vec![],
         };
         Ok(DocumentDiagnosticReportResult::Report(
@@ -196,13 +211,19 @@ impl LanguageServer for Backend {
 impl Backend {
     async fn publish_diagnostics(&self, uri: Url) {
         let diagnostics = match self.documents.get(&uri).await {
-            Some(text) => diagnostics_for(&uri, &text),
+            Some(text) => document_diagnostics_for(&uri, &text).await,
             None => vec![],
         };
         self.client
             .publish_diagnostics(uri, diagnostics, None)
             .await;
     }
+}
+
+async fn document_diagnostics_for(uri: &Url, text: &str) -> Vec<Diagnostic> {
+    let mut diagnostics = diagnostics_for(uri, text);
+    diagnostics.extend(typescript_diagnostics(uri, text).await);
+    diagnostics
 }
 
 fn diagnostics_for(uri: &Url, text: &str) -> Vec<Diagnostic> {
@@ -221,6 +242,223 @@ fn diagnostics_for(uri: &Url, text: &str) -> Vec<Diagnostic> {
     diagnostics.extend(css_diagnostics(text));
     diagnostics.extend(lightweight_ts_diagnostics(text));
     diagnostics
+}
+
+async fn typescript_completions(uri: &Url, text: &str, pos: Position) -> Vec<CompletionItem> {
+    let Some(response) = typescript_query("completion", uri, text, pos).await else {
+        return vec![];
+    };
+    response
+        .items
+        .unwrap_or_default()
+        .into_iter()
+        .map(|item| CompletionItem {
+            label: item.label,
+            kind: Some(ts_completion_kind(&item.kind)),
+            detail: item.detail,
+            insert_text: item.insert_text,
+            ..CompletionItem::default()
+        })
+        .collect()
+}
+
+async fn typescript_hover(uri: &Url, text: &str, pos: Position) -> Option<String> {
+    let response = typescript_query("hover", uri, text, pos).await?;
+    let text = response.text?;
+    if text.trim().is_empty() {
+        None
+    } else {
+        Some(format!("```ts\n{}\n```", text.trim()))
+    }
+}
+
+async fn typescript_definition(uri: &Url, text: &str, pos: Position) -> Option<Range> {
+    let response = typescript_query("definition", uri, text, pos).await?;
+    response
+        .definitions
+        .unwrap_or_default()
+        .into_iter()
+        .find_map(|definition| definition.span.map(Into::into))
+}
+
+async fn typescript_diagnostics(uri: &Url, text: &str) -> Vec<Diagnostic> {
+    let Some(response) = typescript_query("diagnostics", uri, text, Position::new(0, 0)).await
+    else {
+        return vec![];
+    };
+    response
+        .diagnostics
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|diagnostic| !ignored_typescript_diagnostic(diagnostic.code))
+        .map(|diagnostic| Diagnostic {
+            range: diagnostic
+                .span
+                .map(Into::into)
+                .unwrap_or_else(|| Range::new(Position::new(0, 0), end_position(text))),
+            severity: Some(match diagnostic.category.as_deref() {
+                Some("Error") => DiagnosticSeverity::ERROR,
+                Some("Warning") => DiagnosticSeverity::WARNING,
+                Some("Suggestion") => DiagnosticSeverity::HINT,
+                _ => DiagnosticSeverity::INFORMATION,
+            }),
+            source: Some("typescript".into()),
+            code: Some(NumberOrString::Number(diagnostic.code as i32)),
+            message: diagnostic.message,
+            ..Diagnostic::default()
+        })
+        .collect()
+}
+
+fn ignored_typescript_diagnostic(code: u32) -> bool {
+    // Cooked's JSX transform does not require React-style JSX imports.
+    matches!(code, 7026 | 17004 | 2875)
+}
+
+async fn typescript_query(
+    action: &'static str,
+    uri: &Url,
+    text: &str,
+    pos: Position,
+) -> Option<TsResponse> {
+    let request = TsRequest {
+        action,
+        file_name: uri.to_string(),
+        text,
+        position: TsPosition {
+            line: pos.line,
+            character: pos.character,
+        },
+        trigger_character: None,
+    };
+    let payload = serde_json::to_vec(&request).ok()?;
+    for runner in typescript_runners() {
+        if let Some(response) = run_typescript_service(&runner, &payload).await {
+            if response.ok.unwrap_or(false) {
+                return Some(response);
+            }
+        }
+    }
+    None
+}
+
+async fn run_typescript_service(runner: &str, payload: &[u8]) -> Option<TsResponse> {
+    let script = typescript_service_path();
+    let mut child = Command::new(runner)
+        .arg(script)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .ok()?;
+
+    let mut stdin = child.stdin.take()?;
+    stdin.write_all(payload).await.ok()?;
+    drop(stdin);
+
+    let output = timeout(Duration::from_secs(2), child.wait_with_output())
+        .await
+        .ok()?
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    serde_json::from_slice(&output.stdout).ok()
+}
+
+fn typescript_service_path() -> PathBuf {
+    std::env::var_os("COOKED_TYPESCRIPT_SERVICE")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("typescript_service.mjs"))
+}
+
+fn typescript_runners() -> Vec<String> {
+    if let Some(runner) = std::env::var_os("COOKED_TYPESCRIPT_RUNNER") {
+        return vec![runner.to_string_lossy().into_owned()];
+    }
+    vec!["bun".into(), "node".into()]
+}
+
+fn ts_completion_kind(kind: &str) -> CompletionItemKind {
+    match kind {
+        "class" | "interface" | "type" => CompletionItemKind::CLASS,
+        "const" | "let" | "var" | "local var" => CompletionItemKind::VARIABLE,
+        "constructor" | "function" | "local function" => CompletionItemKind::FUNCTION,
+        "enum" => CompletionItemKind::ENUM,
+        "enum member" => CompletionItemKind::ENUM_MEMBER,
+        "keyword" => CompletionItemKind::KEYWORD,
+        "member function" | "method" => CompletionItemKind::METHOD,
+        "member variable" | "property" | "getter" | "setter" => CompletionItemKind::PROPERTY,
+        "module" | "alias" => CompletionItemKind::MODULE,
+        _ => CompletionItemKind::TEXT,
+    }
+}
+
+fn dedupe_completion_items(items: &mut Vec<CompletionItem>) {
+    let mut seen = std::collections::HashSet::new();
+    items.retain(|item| seen.insert(item.label.clone()));
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TsRequest<'a> {
+    action: &'static str,
+    file_name: String,
+    text: &'a str,
+    position: TsPosition,
+    trigger_character: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct TsPosition {
+    line: u32,
+    character: u32,
+}
+
+#[derive(Debug, Deserialize)]
+struct TsResponse {
+    ok: Option<bool>,
+    items: Option<Vec<TsCompletion>>,
+    text: Option<String>,
+    definitions: Option<Vec<TsDefinition>>,
+    diagnostics: Option<Vec<TsDiagnostic>>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TsCompletion {
+    label: String,
+    kind: String,
+    detail: Option<String>,
+    insert_text: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TsDefinition {
+    span: Option<TsSpan>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TsDiagnostic {
+    message: String,
+    category: Option<String>,
+    code: u32,
+    span: Option<TsSpan>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TsSpan {
+    start: TsPosition,
+    end: TsPosition,
+}
+
+impl From<TsSpan> for Range {
+    fn from(span: TsSpan) -> Self {
+        Range::new(
+            Position::new(span.start.line, span.start.character),
+            Position::new(span.end.line, span.end.character),
+        )
+    }
 }
 
 fn completion_items(text: &str, pos: Position) -> Vec<CompletionItem> {
@@ -583,6 +821,26 @@ mod tests {
     fn parses_uri_diagnostic_ranges() {
         let range = diagnostic_range("a\nb\nc", "file:///tmp/App.ck:2:3: expected `}`");
         assert_eq!(range.start, Position::new(1, 2));
+    }
+
+    #[tokio::test]
+    async fn typescript_service_returns_typed_member_completions() {
+        let uri = Url::parse("file:///tmp/App.ck").unwrap();
+        let text = "export fn App(name: string) {\n  rt ( <div>{name.}</div> )\n}\n";
+        let items = typescript_completions(&uri, text, Position::new(1, 18)).await;
+        assert!(items.iter().any(|item| item.label == "toUpperCase"));
+        assert!(items.iter().any(|item| item.label == "trim"));
+    }
+
+    #[tokio::test]
+    async fn typescript_service_returns_type_diagnostics() {
+        let uri = Url::parse("file:///tmp/App.ck").unwrap();
+        let text =
+            "export fn App() {\n  let count: number = \"nope\"\n  rt ( <div>{count}</div> )\n}\n";
+        let diagnostics = typescript_diagnostics(&uri, text).await;
+        assert!(diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.contains("not assignable")));
     }
 }
 

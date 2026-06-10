@@ -41,6 +41,7 @@ export fn Counter(label: string = "Count") {
 - [Language guide](./docs/language.md)
 - [State management](./docs/state.md)
 - [Tooling](./docs/tooling.md)
+- [Language server](./docs/language-server.md)
 - [Architecture](./docs/architecture.md)
 - [Development](./docs/development.md)
 
@@ -59,6 +60,7 @@ See [Getting started](./docs/getting-started.md) for the full local workflow.
 | Path | What |
 |------|------|
 | [`crates/cooked_compiler`](./crates/cooked_compiler) | Rust parser, rewriter, JSX codegen |
+| [`crates/cooked_lsp`](./crates/cooked_lsp) | `tower-lsp` language server with TypeScript service integration |
 | [`crates/cooked_napi`](./crates/cooked_napi) | napi-rs compiler binding |
 | [`packages/runtime`](./packages/runtime) | Runtime, DOM helpers, stores |
 | [`packages/vite-plugin-cooked`](./packages/vite-plugin-cooked) | Vite plugin |

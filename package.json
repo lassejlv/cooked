@@ -6,8 +6,10 @@
   "type": "module",
   "scripts": {
     "build:compiler": "pnpm --filter @cooked/binding build",
+    "build:plugin": "pnpm --filter vite-plugin-cooked build",
     "build:runtime": "pnpm --filter cooked build",
-    "build": "pnpm build:runtime && pnpm build:compiler",
+    "build": "pnpm build:runtime && pnpm build:compiler && pnpm build:plugin",
+    "check": "cargo fmt --check && cargo check && cargo test -p cooked_compiler && pnpm build && pnpm test",
     "test": "pnpm -r test",
     "example": "pnpm --filter @cooked/example-counter dev"
   },

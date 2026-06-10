@@ -92,8 +92,9 @@ Views are JSX:
 
 - **Interpolation** `{expr}` — any TS expression; updates are fine-grained.
 - **Conditionals** `{cond && <Empty />}` or `{cond ? <A /> : <B />}`.
-- **Lists** `{items.map(item => <li>{item.text}</li>)}` (non-keyed: a change
-  rebuilds that list region; effects of replaced nodes are disposed).
+- **Lists** `{items.map(item => <li>{item.text}</li>)}` for simple lists, or
+  `<Keyed each={items} by={item => item.id}>{item => <Row item={item} />}</Keyed>`
+  when DOM identity must survive reorders/removals.
 - **Components** `<TodoItem text={t} onRemove={() => remove(i)} />` — capitalized
   tags call the component with a props object; expression props are passed as
   getters so they stay reactive. Nested markup arrives as the implicit
@@ -112,8 +113,12 @@ Lowercase top-level `fn`s are plain helper functions (exported, types stripped).
 `import` statements pass through to the generated module. The older
 `component Name { ... }` / `view { ... }` block syntax still compiles.
 
-Not yet: spread props (`{...props}`), keyed list reconciliation, scoped `style`,
-source maps, HMR (edits trigger a full reload).
+Not yet: spread props (`{...props}`), scoped `style`, state-preserving HMR.
+
+Source maps are emitted through the Vite plugin, and compiler errors include the
+source filename with line/column context when the compiler can locate the failing
+span. The Vite plugin writes sibling `.d.ck.ts` files for named `.ck` exports so
+TypeScript-aware editors can resolve imports.
 
 ## Architecture
 
@@ -152,5 +157,17 @@ pnpm --filter vite-plugin-cooked build      # build the plugin
 
 cargo test -p cooked_compiler               # compiler unit tests
 pnpm -r test                                # runtime + end-to-end tests
+pnpm check                                  # full local CI gate
 pnpm --filter @cooked/example-counter dev   # run the demo app
 ```
+
+For TypeScript projects, add the shared `.ck` module declaration:
+
+```ts
+/// <reference types="vite-plugin-cooked/client" />
+```
+
+The Vite plugin emits `.d.ck.ts` declaration files next to compiled `.ck` modules
+by default. Set `cooked({ declarations: false })` to disable that. In dev, `.ck`
+edits remount active instances from the updated module without a full page reload;
+preserving component-local state across replacement is still on the roadmap.

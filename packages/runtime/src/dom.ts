@@ -10,6 +10,7 @@ import { createRoot, effect } from "./reactive.js";
 
 type Child = Node | string | number | boolean | null | undefined | Child[];
 type Component = (props: Record<string, unknown>) => Node | PromiseLike<Node>;
+type SpreadValue = Record<string, unknown> | null | undefined | false;
 
 const DOCUMENT_FRAGMENT_NODE = 11;
 const hotMeta = new WeakMap<Component, { id: string; name: string }>();
@@ -195,6 +196,143 @@ export function setStyle(el: ElementCSSInlineStyle, accessor: () => unknown): vo
 /** Attach an event listener. */
 export function listen(el: Element, type: string, handler: EventListenerOrEventListenerObject): void {
   el.addEventListener(type, handler);
+}
+
+/** Merge component props while preserving getters from compiler-created props. */
+export function mergeProps(...sources: Array<Record<string, unknown> | null | undefined>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const source of sources) {
+    if (!source) continue;
+    for (const key of Reflect.ownKeys(source)) {
+      if (typeof key !== "string") continue;
+      const desc = Object.getOwnPropertyDescriptor(source, key);
+      if (desc) Object.defineProperty(out, key, { ...desc, configurable: true });
+    }
+  }
+  return out;
+}
+
+/** Reactively apply a spread attribute object to a DOM element. */
+export function spread(el: Element, accessor: () => SpreadValue): void {
+  const listeners = new Map<string, EventListenerOrEventListenerObject>();
+  let prevKeys = new Set<string>();
+  let styleKeys: string[] = [];
+
+  effect(() => {
+    const next = accessor() || {};
+    const nextKeys = new Set(Object.keys(next));
+
+    for (const key of prevKeys) {
+      if (!nextKeys.has(key)) clearSpreadKey(el, key, listeners, () => {
+        styleKeys = [];
+      });
+    }
+    for (const key of nextKeys) {
+      applySpreadKey(el, key, next[key], listeners, (keys) => {
+        styleKeys = keys;
+      }, styleKeys);
+    }
+
+    prevKeys = nextKeys;
+  });
+}
+
+function clearSpreadKey(
+  el: Element,
+  key: string,
+  listeners: Map<string, EventListenerOrEventListenerObject>,
+  clearStyleKeys: () => void,
+): void {
+  const event = eventName(key);
+  if (event) {
+    const old = listeners.get(event);
+    if (old) el.removeEventListener(event, old);
+    listeners.delete(event);
+    return;
+  }
+  if (key === "className") {
+    el.removeAttribute("class");
+    return;
+  }
+  if (key === "style") {
+    (el as HTMLElement).removeAttribute("style");
+    clearStyleKeys();
+    return;
+  }
+  if (key === "value" || key === "checked") {
+    const target = el as unknown as Record<string, unknown>;
+    target[key] = key === "checked" ? false : "";
+    return;
+  }
+  el.removeAttribute(key);
+}
+
+function applySpreadKey(
+  el: Element,
+  key: string,
+  value: unknown,
+  listeners: Map<string, EventListenerOrEventListenerObject>,
+  setStyleKeys: (keys: string[]) => void,
+  styleKeys: string[],
+): void {
+  const event = eventName(key);
+  if (event) {
+    const old = listeners.get(event);
+    if (old) el.removeEventListener(event, old);
+    if (typeof value === "function" || (value && typeof value === "object")) {
+      const handler = value as EventListenerOrEventListenerObject;
+      el.addEventListener(event, handler);
+      listeners.set(event, handler);
+    } else {
+      listeners.delete(event);
+    }
+    return;
+  }
+
+  if (key === "ref") {
+    if (typeof value === "function") (value as (el: Element) => void)(el);
+    return;
+  }
+  if (key === "class" || key === "className") {
+    if (value == null || value === false) el.removeAttribute("class");
+    else el.setAttribute("class", String(value));
+    return;
+  }
+  if (key === "style") {
+    setStyleKeys(applySpreadStyle(el as unknown as ElementCSSInlineStyle, value, styleKeys));
+    return;
+  }
+  if (key === "value" || key === "checked") {
+    const target = el as unknown as Record<string, unknown>;
+    if (target[key] !== value) target[key] = value;
+    return;
+  }
+
+  if (value == null || value === false) el.removeAttribute(key);
+  else if (value === true) el.setAttribute(key, "");
+  else el.setAttribute(key, String(value));
+}
+
+function applySpreadStyle(el: ElementCSSInlineStyle, value: unknown, prevKeys: string[]): string[] {
+  if (value == null || typeof value === "string") {
+    el.style.cssText = (value as string) ?? "";
+    return [];
+  }
+  const styles = value as Record<string, string | number | null | undefined>;
+  const style = el.style as unknown as Record<string, unknown>;
+  for (const key of prevKeys) {
+    if (!(key in styles)) style[key] = "";
+  }
+  for (const [key, styleValue] of Object.entries(styles)) {
+    style[key] = styleValue == null ? "" : styleValue;
+  }
+  return Object.keys(styles);
+}
+
+function eventName(key: string): string | null {
+  const rest = key.startsWith("on") ? key.slice(2) : "";
+  if (!rest || !/^[A-Za-z]/.test(rest)) return null;
+  return rest.toLowerCase();
 }
 
 /**

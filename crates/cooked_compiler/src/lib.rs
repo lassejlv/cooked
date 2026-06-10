@@ -48,33 +48,54 @@ fn declarations(file: &ast::File) -> String {
     );
 
     for f in &file.functions {
+        let return_ty = f.return_ty.as_deref().unwrap_or("unknown");
         out.push_str(&format!(
-            "export function {}(...args: unknown[]): {};\n",
+            "export function {}({}): {};\n",
             f.name,
+            declaration_params(&f.params),
             if f.is_async {
-                "Promise<unknown>"
+                format!("Promise<{}>", return_ty)
             } else {
-                "unknown"
+                return_ty.to_string()
             }
         ));
     }
 
     for c in &file.components {
-        let props = if c.props.is_empty() {
-            "CookedProps".to_string()
+        let (props_ty, props_optional) = if c.props.is_empty() {
+            ("CookedProps".to_string(), true)
         } else {
             let fields = c
                 .props
                 .iter()
-                .map(|p| format!("{}?: unknown", p.name))
+                .map(|p| {
+                    format!(
+                        "{}{}: {}",
+                        ts_prop_key(&p.name),
+                        if p.optional || p.default.is_some() {
+                            "?"
+                        } else {
+                            ""
+                        },
+                        p.ty.as_deref().unwrap_or("unknown")
+                    )
+                })
                 .collect::<Vec<_>>()
                 .join("; ");
-            format!("{{ {} }} & CookedProps", fields)
+            (
+                format!("{{ {} }} & CookedProps", fields),
+                c.props.iter().all(|p| p.optional || p.default.is_some()),
+            )
+        };
+        let props_param = if props_optional {
+            format!("props?: {}", props_ty)
+        } else {
+            format!("props: {}", props_ty)
         };
         out.push_str(&format!(
-            "export function {}(props?: {}): {};\n",
+            "export function {}({}): {};\n",
             c.name,
-            props,
+            props_param,
             if c.is_async {
                 "PromiseLike<Node>"
             } else {
@@ -83,6 +104,116 @@ fn declarations(file: &ast::File) -> String {
         ));
     }
 
+    out
+}
+
+fn declaration_params(params: &str) -> String {
+    split_declaration_params(params)
+        .into_iter()
+        .filter_map(|param| declaration_param(&param))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn ts_prop_key(name: &str) -> String {
+    let valid = !name.is_empty()
+        && name
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_alphabetic() || c == '_' || c == '$')
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$');
+    if valid {
+        name.to_string()
+    } else {
+        json_string(name)
+    }
+}
+
+fn declaration_param(param: &str) -> Option<String> {
+    let param = param.trim();
+    if param.is_empty() {
+        return None;
+    }
+    if param.starts_with('{') || param.starts_with('[') {
+        return Some("arg: unknown".to_string());
+    }
+
+    let rest = param.strip_prefix("...");
+    let (param, spread) = match rest {
+        Some(rest) => (rest.trim(), true),
+        None => (param, false),
+    };
+    let name: String = param
+        .chars()
+        .take_while(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '$')
+        .collect();
+    if name.is_empty() {
+        return Some(if spread {
+            "...args: unknown[]".to_string()
+        } else {
+            "arg: unknown".to_string()
+        });
+    }
+
+    let after_name = param[name.len()..].trim_start();
+    let optional = after_name.starts_with('?') || parser::find_default_eq(param).is_some();
+    let default_eq = parser::find_default_eq(param);
+    let ty = param.find(':').map(|start| {
+        let end = default_eq.unwrap_or(param.len());
+        param[start + 1..end].trim()
+    });
+    let ty = ty
+        .filter(|ty| !ty.is_empty())
+        .unwrap_or(if spread { "unknown[]" } else { "unknown" });
+
+    if spread {
+        Some(format!("...{}: {}", name, ty))
+    } else {
+        Some(format!(
+            "{}{}: {}",
+            name,
+            if optional { "?" } else { "" },
+            ty
+        ))
+    }
+}
+
+fn split_declaration_params(params: &str) -> Vec<String> {
+    let mut out = vec![];
+    let mut depth = 0i32;
+    let mut cur = String::new();
+    let mut chars = params.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '(' | '[' | '{' | '<' => {
+                depth += 1;
+                cur.push(c);
+            }
+            ')' | ']' | '}' | '>' => {
+                depth -= 1;
+                cur.push(c);
+            }
+            '"' | '\'' | '`' => {
+                cur.push(c);
+                let mut escaped = false;
+                for d in chars.by_ref() {
+                    cur.push(d);
+                    if escaped {
+                        escaped = false;
+                    } else if d == '\\' {
+                        escaped = true;
+                    } else if d == c {
+                        break;
+                    }
+                }
+            }
+            ',' if depth == 0 => out.push(std::mem::take(&mut cur)),
+            _ => cur.push(c),
+        }
+    }
+    out.push(cur);
     out
 }
 
@@ -412,7 +543,7 @@ component App {
         );
         eprintln!("{}", code);
         // component call with a getter prop (stays reactive)
-        assert!(code.contains("Badge({ get count() { return clicks.get(); } })"));
+        assert!(code.contains("Badge($.mergeProps({ get count() { return clicks.get(); } }))"));
         assert!(code.contains("clicks.set(clicks.get() + 1)"));
         // both components exported
         assert!(code.contains("export function Badge(props)"));
@@ -450,6 +581,7 @@ component Page {
         assert!(code.contains("props.children"));
         // children passed as a built fragment
         assert!(code.contains("children: _c"));
+        assert!(code.contains("Card($.mergeProps({ title: \"Hello\", children: _c"));
         // multi-root view becomes a DocumentFragment
         assert!(code.contains("const _root = document.createDocumentFragment();"));
     }
@@ -501,7 +633,7 @@ component App {
 "#,
         );
         assert!(code.contains("import { Button } from \"./Button.ck\";"));
-        assert!(code.contains("Button({ label: \"go\" })"));
+        assert!(code.contains("Button($.mergeProps({ label: \"go\" }))"));
     }
 
     #[test]
@@ -695,22 +827,32 @@ component Broken {
     }
 
     #[test]
-    fn reports_spread_props_as_unsupported() {
-        let out = compile(
+    fn compiles_spread_attributes_and_props() {
+        let code = compile_ok(
             r#"
+component Badge {
+  prop label: string = ""
+  prop tone: string = ""
+  view { <span>{label}:{tone}</span> }
+}
+
 component App {
-  let opts = { a: 1 }
+  let attrs = { class: "box", title: "hi" }
+  let opts = { label: "spread", tone: "quiet" }
+  let mut label = "explicit"
+
   view {
-    <div {...opts} />
+    <div {...attrs} id="root">
+      <Badge {...opts} label={label} />
+    </div>
   }
 }
 "#,
         );
-        assert!(
-            out.errors.iter().any(|e| e.contains("spread")),
-            "errors: {:?}",
-            out.errors
-        );
+        eprintln!("{}", code);
+        assert!(code.contains("$.spread(_el"));
+        assert!(code.contains("() => attrs"));
+        assert!(code.contains("$.mergeProps(opts, { get label() { return label.get(); } })"));
     }
 
     #[test]
@@ -735,15 +877,19 @@ fn formatName(name: string): string {
   return name
 }
 
-export async fn Profile(userId: string) {
+export async fn Profile(userId: string, tags: Array<string> = [], admin?: boolean) {
   rt ( <p>{userId}</p> )
 }
 "#;
         let out = compile_with_filename(src, "Profile.ck");
         assert!(out.errors.is_empty(), "errors: {:?}", out.errors);
-        assert!(out.declarations.contains("export function formatName"));
+        assert!(out
+            .declarations
+            .contains("export function formatName(name: string): string"));
         assert!(out.declarations.contains("export function Profile"));
-        assert!(out.declarations.contains("userId?: unknown"));
+        assert!(out.declarations.contains("props: { userId: string"));
+        assert!(out.declarations.contains("tags?: Array<string>"));
+        assert!(out.declarations.contains("admin?: boolean"));
         assert!(out.declarations.contains("PromiseLike<Node>"));
     }
 }

@@ -8,6 +8,8 @@ import {
   setProp,
   setStyle,
   listen,
+  mergeProps,
+  spread,
   mount,
   hot,
   replaceHot,
@@ -261,6 +263,57 @@ describe("setProp + setStyle", () => {
     const el = document.createElement("div");
     setStyle(el, () => "color: green");
     expect(el.style.color).toBe("green");
+  });
+});
+
+describe("spread + mergeProps", () => {
+  it("merges props in order and preserves getters", () => {
+    const count = signal(0);
+    const out = mergeProps(
+      { label: "first", value: 1 },
+      {
+        get value() {
+          return count.get();
+        },
+      },
+      { label: "last" },
+    );
+
+    const seen: unknown[] = [];
+    effect(() => seen.push(out.value));
+    count.set(2);
+
+    expect(out.label).toBe("last");
+    expect(seen).toEqual([0, 2]);
+  });
+
+  it("reactively applies spread DOM attributes, styles and listeners", () => {
+    const button = document.createElement("button");
+    const clicks = vi.fn();
+    const attrs = signal<Record<string, unknown>>({
+      class: "primary",
+      disabled: true,
+      style: { color: "red", fontSize: "12px" },
+      onClick: clicks,
+    });
+
+    spread(button, () => attrs.get());
+    expect(button.className).toBe("primary");
+    expect(button.hasAttribute("disabled")).toBe(true);
+    expect(button.style.color).toBe("red");
+    expect(button.style.fontSize).toBe("12px");
+
+    button.dispatchEvent(new Event("click"));
+    expect(clicks).toHaveBeenCalledTimes(1);
+
+    attrs.set({ className: "secondary", style: { color: "blue" } });
+    expect(button.className).toBe("secondary");
+    expect(button.hasAttribute("disabled")).toBe(false);
+    expect(button.style.color).toBe("blue");
+    expect(button.style.fontSize).toBe("");
+
+    button.dispatchEvent(new Event("click"));
+    expect(clicks).toHaveBeenCalledTimes(1);
   });
 });
 

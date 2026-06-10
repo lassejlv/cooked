@@ -335,7 +335,7 @@ impl Parser {
         let params = self.capture(&[')'], false);
         self.expect(')')?;
         self.skip_ws();
-        self.skip_return_type();
+        let return_ty = self.take_return_type();
         let is_component = name.chars().next().is_some_and(|c| c.is_ascii_uppercase());
         if is_component {
             let mut comp = Component {
@@ -352,6 +352,7 @@ impl Parser {
                 name,
                 is_async,
                 params,
+                return_ty,
                 body,
             });
         }
@@ -432,15 +433,24 @@ impl Parser {
         self.skip_inline();
         let name = self.parse_ident()?;
         self.skip_inline();
-        if self.peek() == '?' {
+        let optional = if self.peek() == '?' {
             self.pos += 1;
             self.skip_inline();
-        }
-        if self.peek() == ':' {
+            true
+        } else {
+            false
+        };
+        let ty = if self.peek() == ':' {
             self.pos += 1;
-            // type annotation — captured and discarded
-            let _ = self.capture(&['=', '\n', '}'], true);
-        }
+            let ty = self.capture(&['=', '\n', '}'], true);
+            if ty.is_empty() {
+                None
+            } else {
+                Some(ty)
+            }
+        } else {
+            None
+        };
         self.skip_inline();
         let default = if self.peek() == '=' {
             self.pos += 1;
@@ -453,7 +463,12 @@ impl Parser {
         } else {
             None
         };
-        Ok(Prop { name, default })
+        Ok(Prop {
+            name,
+            ty,
+            optional,
+            default,
+        })
     }
 
     fn parse_let(&mut self, comp: &mut Component) -> PResult<()> {
@@ -502,21 +517,33 @@ impl Parser {
         let params = self.capture(&[')'], false);
         self.expect(')')?;
         self.skip_ws();
-        self.skip_return_type();
+        self.take_return_type();
         let body = self.capture_block_inner()?;
         Ok(Func { name, params, body })
     }
 
-    /// Skip an optional `-> Type` or `: Type` return annotation before `{`.
-    fn skip_return_type(&mut self) {
+    /// Capture an optional `-> Type` or `: Type` return annotation before `{`.
+    fn take_return_type(&mut self) -> Option<String> {
         if self.peek() == '-' && self.peek2() == '>' {
             self.pos += 2;
-            let _ = self.capture(&['{'], false);
+            let ty = self.capture(&['{'], false);
             self.skip_ws();
+            if ty.is_empty() {
+                None
+            } else {
+                Some(ty)
+            }
         } else if self.peek() == ':' {
             self.pos += 1;
-            let _ = self.capture(&['{'], false);
+            let ty = self.capture(&['{'], false);
             self.skip_ws();
+            if ty.is_empty() {
+                None
+            } else {
+                Some(ty)
+            }
+        } else {
+            None
         }
     }
 
@@ -732,9 +759,18 @@ fn params_to_props(params: &str) -> PResult<Vec<Prop>> {
         if name.is_empty() {
             return Err(format!("invalid component parameter `{}`", piece));
         }
-        let default = find_default_eq(piece).map(|i| piece[i + 1..].trim().to_string());
+        let default_eq = find_default_eq(piece);
+        let type_start = piece.find(':');
+        let optional = piece[name.len()..].trim_start().starts_with('?') || default_eq.is_some();
+        let ty = type_start.map(|start| {
+            let end = default_eq.unwrap_or(piece.len());
+            piece[start + 1..end].trim().to_string()
+        });
+        let default = default_eq.map(|i| piece[i + 1..].trim().to_string());
         props.push(Prop {
             name,
+            ty: ty.filter(|t| !t.is_empty()),
+            optional,
             default: default.filter(|d| !d.is_empty()),
         });
     }

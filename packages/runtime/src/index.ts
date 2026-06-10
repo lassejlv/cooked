@@ -11,6 +11,16 @@ export {
 } from "./reactive.js";
 
 export {
+  createStore,
+  createActions,
+  atom,
+  type Equality,
+  type Store,
+  type StoreUpdater,
+  type Patch,
+} from "./store.js";
+
+export {
   insert,
   keyed,
   append,
@@ -19,6 +29,8 @@ export {
   setProp,
   setStyle,
   listen,
+  mergeProps,
+  spread,
   withDefaults,
   hot,
   replaceHot,

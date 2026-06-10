@@ -40,12 +40,15 @@ pub struct RawFn {
     pub name: String,
     pub is_async: bool,
     pub params: String, // raw param list text (types stripped at codegen)
-    pub body: String,   // raw statement-block body
+    pub return_ty: Option<String>,
+    pub body: String, // raw statement-block body
 }
 
 #[derive(Debug, Clone)]
 pub struct Prop {
     pub name: String,
+    pub ty: Option<String>,
+    pub optional: bool,
     pub default: Option<String>, // raw expr text; type annotations are dropped
 }
 

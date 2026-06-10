@@ -214,8 +214,10 @@ impl<'a> Gen<'a> {
     fn gen_dom_attr(&mut self, var: &str, item: &JSXAttributeItem) -> Result<(), String> {
         let attr = match item {
             JSXAttributeItem::Attribute(a) => a,
-            JSXAttributeItem::SpreadAttribute(_) => {
-                return Err("view: spread attributes are not supported yet".into());
+            JSXAttributeItem::SpreadAttribute(a) => {
+                let expr = self.rewrite(a.argument.span())?;
+                self.stmt(&format!("$.spread({}, () => {});", var, expr));
+                return Ok(());
             }
         };
         let name = match &attr.name {
@@ -373,12 +375,20 @@ impl<'a> Gen<'a> {
         name: &str,
         parent: Option<&str>,
     ) -> Result<String, String> {
-        let mut props: Vec<String> = vec![];
+        let mut prop_args: Vec<String> = vec![];
+        let mut prop_object: Vec<String> = vec![];
         for item in &el.opening_element.attributes {
             let attr = match item {
                 JSXAttributeItem::Attribute(a) => a,
-                JSXAttributeItem::SpreadAttribute(_) => {
-                    return Err("view: spread props are not supported yet".into());
+                JSXAttributeItem::SpreadAttribute(a) => {
+                    if !prop_object.is_empty() {
+                        prop_args.push(format!(
+                            "{{ {} }}",
+                            std::mem::take(&mut prop_object).join(", ")
+                        ));
+                    }
+                    prop_args.push(self.rewrite(a.argument.span())?);
+                    continue;
                 }
             };
             let pname = match &attr.name {
@@ -389,10 +399,12 @@ impl<'a> Gen<'a> {
             };
             let key = prop_key(&pname);
             match self.attr_value(&pname, &attr.value)? {
-                AttrValue::None => props.push(format!("{}: true", key)),
-                AttrValue::Str(s) => props.push(format!("{}: {}", key, js_string(&s))),
+                AttrValue::None => prop_object.push(format!("{}: true", key)),
+                AttrValue::Str(s) => prop_object.push(format!("{}: {}", key, js_string(&s))),
                 // Getter keeps the prop reactive without evaluating it eagerly.
-                AttrValue::Expr(e) => props.push(format!("get {}() {{ return {}; }}", key, e)),
+                AttrValue::Expr(e) => {
+                    prop_object.push(format!("get {}() {{ return {}; }}", key, e))
+                }
             }
         }
 
@@ -406,16 +418,19 @@ impl<'a> Gen<'a> {
             for k in kids {
                 self.gen_child(k, &cv)?;
             }
-            props.push(format!("children: {}", cv));
+            prop_object.push(format!("children: {}", cv));
+        }
+        if !prop_object.is_empty() {
+            prop_args.push(format!("{{ {} }}", prop_object.join(", ")));
         }
 
         let var = self.fresh("el");
-        self.stmt(&format!(
-            "const {} = {}({{ {} }});",
-            var,
-            name,
-            props.join(", ")
-        ));
+        let props_expr = if prop_args.is_empty() {
+            "{}".to_string()
+        } else {
+            format!("$.mergeProps({})", prop_args.join(", "))
+        };
+        self.stmt(&format!("const {} = {}({});", var, name, props_expr));
         if let Some(p) = parent {
             // $.append handles async components (Promise<Node>) with a marker.
             self.stmt(&format!("$.append({}, {});", p, var));

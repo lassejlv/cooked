@@ -14,6 +14,10 @@ export fn Counter(label: string = "Count") {
     <div class="counter">
       <h1>{label}: {count} (x2 = {doubled})</h1>
       <button onClick={inc}>+</button>
+
+      <footer>
+        <p style="color: red;">Count: {count}</p>
+      </footer>
     </div>
   )
 }

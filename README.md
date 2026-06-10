@@ -1,6 +1,6 @@
 # Cooked 🥒
 
-A Svelte/Solid-style **compiled** UI language. Rust × TypeScript.
+A compiled web UI framework with fine-grained reactivity, built-in state, and zero virtual DOM.
 
 - **Compiled, not interpreted** — `.ck` files compile to imperative DOM + fine-grained
   signals. No virtual DOM, tiny runtime (the example app bundles to ~2.4 kB gzipped).
@@ -105,6 +105,8 @@ Views are JSX:
   combine with `onInput={e => draft = e.target.value}`.
 - **Attributes** — static strings are set once; `{expr}` values update reactively;
   boolean shorthand (`<input disabled />`) and `style={{ color: "red" }}` work.
+- **Spread attributes/props** — `{...attrs}` works on DOM elements and
+  components; later props override earlier spread values.
 - **Refs** `ref={el => input = el}` receives the DOM element.
 - **Async components** — `export async fn` may `await` before `rt`; parents render
   a placeholder marker and the markup lands when the promise resolves.
@@ -113,12 +115,34 @@ Lowercase top-level `fn`s are plain helper functions (exported, types stripped).
 `import` statements pass through to the generated module. The older
 `component Name { ... }` / `view { ... }` block syntax still compiles.
 
-Not yet: spread props (`{...props}`), scoped `style`, state-preserving HMR.
+Not yet: scoped `style`, state-preserving HMR.
 
 Source maps are emitted through the Vite plugin, and compiler errors include the
 source filename with line/column context when the compiler can locate the failing
 span. The Vite plugin writes sibling `.d.ck.ts` files for named `.ck` exports so
 TypeScript-aware editors can resolve imports.
+
+## State
+
+Cooked ships tiny built-in state primitives. Use `let mut` inside `.ck`
+components for local state. For shared app state, use `createStore`:
+
+```ts
+import { createStore, createActions } from "cooked";
+
+export const counter = createStore({ count: 0, label: "Cooked" });
+export const counterActions = createActions(counter, ({ get, patch }) => ({
+  inc() {
+    patch({ count: get().count + 1 });
+  },
+}));
+
+export const count = counter.select((state) => state.count);
+```
+
+Selectors are equality-checked, so components/effects that read `count.get()`
+only update when that slice changes. `atom(value)` is also exported as a tiny
+writable signal alias for local JS/TS state outside `.ck` files.
 
 ## Architecture
 

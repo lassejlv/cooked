@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/cooked_compiler", "crates/cooked_napi"]
+members = ["crates/cooked_compiler", "crates/cooked_lsp", "crates/cooked_napi"]
 
 [workspace.package]
 version = "0.0.1"

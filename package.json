@@ -6,10 +6,13 @@
   "type": "module",
   "scripts": {
     "build:compiler": "pnpm --filter @cooked/binding build",
+    "build:lsp": "cargo build -p cooked_lsp --bin cooked-lsp",
     "build:plugin": "pnpm --filter vite-plugin-cooked build",
     "build:runtime": "pnpm --filter cooked build",
-    "build": "pnpm build:runtime && pnpm build:compiler && pnpm build:plugin",
-    "check": "cargo fmt --check && cargo check && cargo test -p cooked_compiler && pnpm build && pnpm test",
+    "build": "pnpm build:runtime && pnpm build:compiler && pnpm build:plugin && pnpm build:lsp",
+    "check": "cargo fmt --check && cargo check && cargo test -p cooked_compiler && cargo test -p cooked_lsp && pnpm build && pnpm test",
+    "lsp": "cargo run -p cooked_lsp --bin cooked-lsp",
+    "lsp:build": "cargo build -p cooked_lsp --bin cooked-lsp",
     "test": "pnpm -r test",
     "example": "pnpm --filter @cooked/example-counter dev"
   },

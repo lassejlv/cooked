@@ -50,6 +50,24 @@ In development, `.ck` edits remount active instances from the updated module
 without a full page reload. Preserving component-local state across replacement
 is still on the roadmap.
 
+## Language server
+
+Cooked includes a Rust LSP server built with `tower-lsp`:
+
+```bash
+pnpm lsp
+```
+
+For editor integrations, point the language client at:
+
+```bash
+cargo run -p cooked_lsp --bin cooked-lsp
+```
+
+The server supports `.ck` document sync, compiler diagnostics, completion,
+hover, document symbols, definition lookup, TypeScript/JavaScript-oriented
+member completions, and CSS property completions inside `style={{ ... }}`.
+
 ## Related docs
 
 - [Getting started](./getting-started.md)

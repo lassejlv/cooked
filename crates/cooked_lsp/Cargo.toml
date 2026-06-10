@@ -1,0 +1,15 @@
+[package]
+name = "cooked_lsp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "cooked-lsp"
+path = "src/main.rs"
+
+[dependencies]
+cooked_compiler = { workspace = true }
+tokio = { version = "1", features = ["io-std", "macros", "rt-multi-thread", "sync"] }
+tower-lsp = "0.20"
+url = "2"

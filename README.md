@@ -31,6 +31,7 @@ export fn Counter(label: string = "Count") {
 - Fine-grained signals, effects, derived values, keyed lists, and zero virtual DOM.
 - Built-in typed stores, atoms, selectors, and actions.
 - Vite plugin with source maps, generated `.d.ck.ts` files, and HMR remounting.
+- Rust `tower-lsp` language server for completion, hover, diagnostics, symbols, and CSS help.
 - Tiny runtime and direct DOM output.
 
 ## Docs

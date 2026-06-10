@@ -5,9 +5,10 @@
 
 use crate::ast::*;
 use crate::jsx;
+use crate::jsx::js_string;
 use crate::rewrite::{rewrite_expr, rewrite_ts, Kind, SymbolMap};
 
-pub fn gen_module(file: &File) -> Result<String, String> {
+pub fn gen_module(file: &File, filename: &str) -> Result<String, String> {
     let mut out = String::from("import * as $ from \"cooked\";\n");
     for imp in &file.imports {
         out.push_str(imp);
@@ -20,7 +21,19 @@ pub fn gen_module(file: &File) -> Result<String, String> {
     }
     for comp in &file.components {
         out.push_str(&gen_component(comp).map_err(|e| format!("component {}: {}", comp.name, e))?);
+        out.push_str(&format!(
+            "$.hot({}, {}, {});\n",
+            comp.name,
+            js_string(filename),
+            js_string(&comp.name)
+        ));
         out.push('\n');
+    }
+    if !file.components.is_empty() {
+        out.push_str(&format!(
+            "if (import.meta.hot) {{ import.meta.hot.accept((mod) => $.replaceHot({}, mod)); }}\n",
+            js_string(filename)
+        ));
     }
     Ok(out)
 }
@@ -56,7 +69,10 @@ fn gen_component(comp: &Component) -> Result<String, String> {
     let map = build_symbols(comp);
     let mut b = String::new();
     let asyncness = if comp.is_async { "async " } else { "" };
-    b.push_str(&format!("export {}function {}(props) {{\n", asyncness, comp.name));
+    b.push_str(&format!(
+        "export {}function {}(props) {{\n",
+        asyncness, comp.name
+    ));
 
     // prop defaults
     let mut defaults: Vec<String> = vec![];
@@ -65,7 +81,10 @@ fn gen_component(comp: &Component) -> Result<String, String> {
             defaults.push(format!("{}: {}", p.name, rewrite_expr(d, &map)?));
         }
     }
-    b.push_str(&format!("  props = $.withDefaults(props ?? {{}}, {{ {} }});\n", defaults.join(", ")));
+    b.push_str(&format!(
+        "  props = $.withDefaults(props ?? {{}}, {{ {} }});\n",
+        defaults.join(", ")
+    ));
 
     // body in source order; `rt (...)` compiles to the returned DOM tree
     let mut has_view = false;
@@ -81,22 +100,29 @@ fn gen_component(comp: &Component) -> Result<String, String> {
                 d.name,
                 rewrite_expr(&d.expr, &map)?
             )),
-            Item::Const(c) => {
-                b.push_str(&format!("  const {} = {};\n", c.name, rewrite_expr(&c.expr, &map)?))
-            }
+            Item::Const(c) => b.push_str(&format!(
+                "  const {} = {};\n",
+                c.name,
+                rewrite_expr(&c.expr, &map)?
+            )),
             Item::Fn(f) => b.push_str(&format!(
                 "  const {} = ({}) => {{ {} }};\n",
                 f.name,
                 strip_params(&f.params),
                 rewrite_ts(&f.body, &map)?
             )),
-            Item::Effect(e) => {
-                b.push_str(&format!("  $.effect(() => {{ {} }});\n", rewrite_ts(e, &map)?))
-            }
+            Item::Effect(e) => b.push_str(&format!(
+                "  $.effect(() => {{ {} }});\n",
+                rewrite_ts(e, &map)?
+            )),
             Item::Raw(stmt) => {
                 let code = rewrite_ts(stmt, &map)?;
                 let code = code.trim_end();
-                let semi = if code.ends_with(';') || code.ends_with('}') { "" } else { ";" };
+                let semi = if code.ends_with(';') || code.ends_with('}') {
+                    ""
+                } else {
+                    ";"
+                };
                 b.push_str(&format!("  {}{}\n", code, semi));
             }
             Item::View(view_src) => {

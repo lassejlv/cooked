@@ -9,8 +9,15 @@
 import { createRoot, effect } from "./reactive.js";
 
 type Child = Node | string | number | boolean | null | undefined | Child[];
+type Component = (props: Record<string, unknown>) => Node | PromiseLike<Node>;
 
 const DOCUMENT_FRAGMENT_NODE = 11;
+const hotMeta = new WeakMap<Component, { id: string; name: string }>();
+const hotInstances = new Map<string, Set<HotInstance>>();
+
+interface HotInstance {
+  rerender(component: Component): void;
+}
 
 // nodeType checks instead of instanceof: they hold across realms (and DOM
 // shims whose instances don't satisfy instanceof, like happy-dom fragments).
@@ -71,6 +78,51 @@ export function insert(
     } else {
       apply(normalize(value));
     }
+  });
+}
+
+/**
+ * Reactively render a keyed list. Existing keyed nodes are moved instead of
+ * rebuilt, and removed keys dispose the effects created while rendering them.
+ */
+export function keyed<T, K extends PropertyKey>(
+  parent: Node,
+  items: () => readonly T[],
+  key: (item: T, index: number) => K,
+  render: (item: T, index: number) => Child,
+  marker: Node | null = null,
+): void {
+  interface Entry {
+    nodes: Node[];
+    dispose: () => void;
+  }
+
+  let entries = new Map<K, Entry>();
+  effect(() => {
+    const nextEntries = new Map<K, Entry>();
+    const nextItems = items();
+    const host = marker?.parentNode ?? parent;
+
+    nextItems.forEach((item, index) => {
+      const k = key(item, index);
+      let entry = entries.get(k);
+      if (!entry) {
+        entry = createRoot((dispose) => ({
+          nodes: normalize(render(item, index)),
+          dispose,
+        }));
+      }
+      nextEntries.set(k, entry);
+      for (const node of entry.nodes) host.insertBefore(node, marker);
+    });
+
+    for (const [k, entry] of entries) {
+      if (nextEntries.has(k)) continue;
+      entry.dispose();
+      for (const node of entry.nodes) node.parentNode?.removeChild(node);
+    }
+
+    entries = nextEntries;
   });
 }
 
@@ -178,37 +230,93 @@ export function withDefaults<T extends object>(props: Partial<T>, defaults: Part
   return out as T;
 }
 
+/** Attach dev-only HMR identity to a compiled component function. */
+export function hot<T extends Component>(component: T, id: string, name: string): T {
+  hotMeta.set(component, { id, name });
+  return component;
+}
+
+/** Replace mounted instances for the updated module exports. */
+export function replaceHot(id: string, mod: Record<string, unknown> | undefined): void {
+  if (!mod) return;
+  for (const [key, instances] of hotInstances) {
+    if (!key.startsWith(`${id}:`)) continue;
+    const name = key.slice(id.length + 1);
+    const next = mod[name];
+    if (typeof next !== "function") continue;
+    const component = hot(next as Component, id, name);
+    for (const instance of [...instances]) instance.rerender(component);
+  }
+}
+
 /**
  * Mount a component into a target element. Runs under a fresh ownership root;
  * the returned disposer tears down every effect and removes the rendered nodes.
  * Async components (`Promise<Node>`) render when they resolve.
  */
 export function mount(
-  component: (props: Record<string, unknown>) => Node | PromiseLike<Node>,
+  component: Component,
   target: Element,
   props: Record<string, unknown> = {},
 ): () => void {
-  return createRoot((dispose) => {
-    const result = component(props);
-    let nodes: Node[] = [];
-    let disposed = false;
-    const add = (node: Node) => {
-      nodes = isFragment(node) ? [...node.childNodes] : [node];
-      target.appendChild(node);
-    };
-    if (isThenable(result)) {
-      void result.then((node) => {
-        if (!disposed) add(node as Node);
-      });
-    } else {
-      add(result);
+  let activeComponent = component;
+  let disposeRoot = () => {};
+  let nodes: Node[] = [];
+  let disposed = false;
+  let version = 0;
+
+  const removeNodes = () => {
+    for (const n of nodes) {
+      if (n.parentNode === target) target.removeChild(n);
     }
-    return () => {
-      disposed = true;
-      dispose();
-      for (const n of nodes) {
-        if (n.parentNode === target) target.removeChild(n);
+    nodes = [];
+  };
+
+  const render = (nextComponent = activeComponent) => {
+    activeComponent = nextComponent;
+    version++;
+    const current = version;
+    disposeRoot();
+    removeNodes();
+    createRoot((dispose) => {
+      disposeRoot = dispose;
+      const result = activeComponent(props);
+      const add = (node: Node) => {
+        if (disposed || current !== version) return;
+        nodes = isFragment(node) ? [...node.childNodes] : [node];
+        target.appendChild(node);
+      };
+      if (isThenable(result)) {
+        void result.then((node) => add(node as Node));
+      } else {
+        add(result);
       }
-    };
-  });
+    });
+  };
+
+  const meta = hotMeta.get(component);
+  const hotKey = meta ? `${meta.id}:${meta.name}` : null;
+  const instance: HotInstance = { rerender: render };
+  if (hotKey) {
+    let set = hotInstances.get(hotKey);
+    if (!set) {
+      set = new Set();
+      hotInstances.set(hotKey, set);
+    }
+    set.add(instance);
+  }
+
+  render();
+
+  return () => {
+    disposed = true;
+    if (hotKey) {
+      const set = hotInstances.get(hotKey);
+      set?.delete(instance);
+      if (set?.size === 0) hotInstances.delete(hotKey);
+    }
+    version++;
+    disposeRoot();
+    removeNodes();
+  };
 }

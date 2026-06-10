@@ -9,9 +9,16 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./client": {
+      "types": "./client.d.ts",
+      "default": "./client.d.ts"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist",
+    "client.d.ts"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json"
   },
@@ -22,6 +29,7 @@
     "vite": ">=5"
   },
   "devDependencies": {
+    "@types/node": "^25.9.2",
     "typescript": "^5.7.2",
     "vite": "^6.0.3"
   }

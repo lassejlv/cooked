@@ -32,7 +32,10 @@ enum Frame {
 
 impl Parser {
     fn new(source: &str) -> Self {
-        Parser { chars: source.chars().collect(), pos: 0 }
+        Parser {
+            chars: source.chars().collect(),
+            pos: 0,
+        }
     }
 
     // ----- cursor primitives -----
@@ -99,7 +102,11 @@ impl Parser {
             self.pos += 1;
             Ok(())
         } else {
-            Err(format!("expected '{}' but found '{}'", c, self.describe_here()))
+            Err(format!(
+                "expected '{}' but found '{}'",
+                c,
+                self.describe_here()
+            ))
         }
     }
 
@@ -121,7 +128,10 @@ impl Parser {
 
     fn parse_ident(&mut self) -> PResult<String> {
         if !Self::is_ident_start(self.peek()) {
-            return Err(format!("expected identifier, found '{}'", self.describe_here()));
+            return Err(format!(
+                "expected identifier, found '{}'",
+                self.describe_here()
+            ));
         }
         let mut s = String::new();
         while Self::is_ident_part(self.peek()) {
@@ -138,7 +148,11 @@ impl Parser {
                 return false;
             }
         }
-        let after = self.chars.get(self.pos + kw_chars.len()).copied().unwrap_or('\0');
+        let after = self
+            .chars
+            .get(self.pos + kw_chars.len())
+            .copied()
+            .unwrap_or('\0');
         !Self::is_ident_part(after)
     }
 
@@ -275,7 +289,11 @@ impl Parser {
     // ----- grammar -----
 
     fn parse_file(&mut self) -> PResult<File> {
-        let mut file = File { imports: vec![], components: vec![], functions: vec![] };
+        let mut file = File {
+            imports: vec![],
+            components: vec![],
+            functions: vec![],
+        };
         self.skip_ws();
         while !self.eof() {
             if self.at_keyword("component") {
@@ -320,13 +338,22 @@ impl Parser {
         self.skip_return_type();
         let is_component = name.chars().next().is_some_and(|c| c.is_ascii_uppercase());
         if is_component {
-            let mut comp =
-                Component { name, is_async, props: params_to_props(&params)?, items: vec![] };
+            let mut comp = Component {
+                name,
+                is_async,
+                props: params_to_props(&params)?,
+                items: vec![],
+            };
             self.parse_component_body(&mut comp)?;
             file.components.push(comp);
         } else {
             let body = self.capture_block_inner()?;
-            file.functions.push(RawFn { name, is_async, params, body });
+            file.functions.push(RawFn {
+                name,
+                is_async,
+                params,
+                body,
+            });
         }
         Ok(())
     }
@@ -337,7 +364,12 @@ impl Parser {
         self.skip_ws();
         let name = self.parse_ident()?;
         self.skip_ws();
-        let mut comp = Component { name, is_async: false, props: vec![], items: vec![] };
+        let mut comp = Component {
+            name,
+            is_async: false,
+            props: vec![],
+            items: vec![],
+        };
         self.parse_component_body(&mut comp)?;
         Ok(comp)
     }
@@ -413,7 +445,11 @@ impl Parser {
         let default = if self.peek() == '=' {
             self.pos += 1;
             let d = self.capture(&['\n', '}'], false);
-            if d.is_empty() { None } else { Some(d) }
+            if d.is_empty() {
+                None
+            } else {
+                Some(d)
+            }
         } else {
             None
         };
@@ -449,7 +485,10 @@ impl Parser {
                 comp.items.push(Item::Const(Binding { name, expr }));
             }
         } else {
-            return Err(format!("expected '=' or '=>' in let binding, found '{}'", self.describe_here()));
+            return Err(format!(
+                "expected '=' or '=>' in let binding, found '{}'",
+                self.describe_here()
+            ));
         }
         Ok(())
     }
@@ -490,7 +529,10 @@ impl Parser {
     /// `{ ... }` expression, and only applies string/comment rules in the last.
     fn capture_view_body(&mut self, close: char) -> PResult<String> {
         let start = self.pos;
-        let mut stack: Vec<Frame> = vec![Frame::Markup { tag_depth: 0, from_expr: false }];
+        let mut stack: Vec<Frame> = vec![Frame::Markup {
+            tag_depth: 0,
+            from_expr: false,
+        }];
         // For the `<` is-it-JSX heuristic inside expressions: the last
         // significant (non-space) chars and the last identifier word seen.
         let mut last_sig: (char, char) = ('\0', '\0');
@@ -499,7 +541,10 @@ impl Parser {
         while !self.eof() {
             let c = self.peek();
             match stack.last_mut().expect("scanner stack never empty") {
-                Frame::Markup { tag_depth, from_expr } => match c {
+                Frame::Markup {
+                    tag_depth,
+                    from_expr,
+                } => match c {
                     _ if c == close && *tag_depth == 0 => {
                         if *from_expr {
                             return Err(format!(
@@ -551,7 +596,11 @@ impl Parser {
                         stack.pop();
                         // self-closing: if this completed JSX nested in an
                         // expression, pop back to the expression frame.
-                        if let Some(Frame::Markup { tag_depth: 0, from_expr: true }) = stack.last() {
+                        if let Some(Frame::Markup {
+                            tag_depth: 0,
+                            from_expr: true,
+                        }) = stack.last()
+                        {
                             stack.pop();
                         }
                     }
@@ -606,7 +655,10 @@ impl Parser {
                     }
                     '<' if Self::jsx_starts_here(self.peek2(), last_sig, &last_word) => {
                         self.pos += 1;
-                        stack.push(Frame::Markup { tag_depth: 0, from_expr: true });
+                        stack.push(Frame::Markup {
+                            tag_depth: 0,
+                            from_expr: true,
+                        });
                         stack.push(Frame::Tag);
                     }
                     _ => {
@@ -636,12 +688,28 @@ impl Parser {
         }
         let (prev2, prev) = last_sig;
         let after_arrow = prev == '>' && prev2 == '=';
-        let keyword = matches!(last_word, "return" | "yield" | "await" | "typeof" | "case" | "do" | "else" | "in" | "of" | "void" | "new");
+        let keyword = matches!(
+            last_word,
+            "return"
+                | "yield"
+                | "await"
+                | "typeof"
+                | "case"
+                | "do"
+                | "else"
+                | "in"
+                | "of"
+                | "void"
+                | "new"
+        );
         if keyword {
             return true;
         }
         after_arrow
-            || matches!(prev, '\0' | '(' | ',' | '?' | ':' | '=' | '&' | '|' | '!' | ';' | '[' | '{' | '}')
+            || matches!(
+                prev,
+                '\0' | '(' | ',' | '?' | ':' | '=' | '&' | '|' | '!' | ';' | '[' | '{' | '}'
+            )
     }
 }
 
@@ -657,12 +725,18 @@ fn params_to_props(params: &str) -> PResult<Vec<Prop>> {
         if piece.starts_with('{') || piece.starts_with('[') || piece.starts_with("...") {
             return Err("component props must be simple `name: type = default` parameters".into());
         }
-        let name: String = piece.chars().take_while(|c| Parser::is_ident_part(*c)).collect();
+        let name: String = piece
+            .chars()
+            .take_while(|c| Parser::is_ident_part(*c))
+            .collect();
         if name.is_empty() {
             return Err(format!("invalid component parameter `{}`", piece));
         }
         let default = find_default_eq(piece).map(|i| piece[i + 1..].trim().to_string());
-        props.push(Prop { name, default: default.filter(|d| !d.is_empty()) });
+        props.push(Prop {
+            name,
+            default: default.filter(|d| !d.is_empty()),
+        });
     }
     Ok(props)
 }

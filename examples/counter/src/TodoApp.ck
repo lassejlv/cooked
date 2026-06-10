@@ -10,16 +10,18 @@ export fn TodoItem(text: string, onRemove) {
 export fn TodoApp() {
   let mut todos = []
   let mut draft = ""
+  let mut nextId = 0
   let remaining => todos.length
 
   fn add() {
     if (draft.trim() === "") return
-    todos = [...todos, draft.trim()]
+    todos = [...todos, { id: nextId, text: draft.trim() }]
+    nextId += 1
     draft = ""
   }
 
-  fn remove(index: number) {
-    todos = todos.filter((_, i) => i !== index)
+  fn remove(id: number) {
+    todos = todos.filter(todo => todo.id !== id)
   }
 
   rt (
@@ -35,7 +37,9 @@ export fn TodoApp() {
       </form>
       {todos.length === 0 && <p class="empty">Nothing to do — enjoy your day</p>}
       <ul>
-        {todos.map((text, i) => <TodoItem text={text} onRemove={() => remove(i)} />)}
+        <Keyed each={todos} by={todo => todo.id}>
+          {todo => <TodoItem text={todo.text} onRemove={() => remove(todo.id)} />}
+        </Keyed>
       </ul>
     </section>
   )

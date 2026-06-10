@@ -12,6 +12,7 @@ export {
 
 export {
   insert,
+  keyed,
   append,
   setAttr,
   attr,
@@ -19,5 +20,7 @@ export {
   setStyle,
   listen,
   withDefaults,
+  hot,
+  replaceHot,
   mount,
 } from "./dom.js";

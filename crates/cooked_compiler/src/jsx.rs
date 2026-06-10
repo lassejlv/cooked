@@ -47,20 +47,32 @@ pub fn gen_view(body: &str, map: &SymbolMap) -> Result<ViewCode, String> {
     };
 
     let shadows = HashSet::new();
-    let mut g =
-        Gen { src: &src, map, shadows: &shadows, out: String::new(), counter: 0, indent: "  " };
+    let mut g = Gen {
+        src: &src,
+        map,
+        shadows: &shadows,
+        out: String::new(),
+        counter: 0,
+        indent: "  ",
+    };
     let kids: Vec<&JSXChild> = frag.children.iter().filter(|c| !is_blank(c)).collect();
     if kids.len() == 1 {
         if let JSXChild::Element(el) = kids[0] {
             let var = g.gen_element(el, None)?;
-            return Ok(ViewCode { stmts: g.out, root: var });
+            return Ok(ViewCode {
+                stmts: g.out,
+                root: var,
+            });
         }
     }
     g.stmt("const _root = document.createDocumentFragment();");
     for k in kids {
         g.gen_child(k, "_root")?;
     }
-    Ok(ViewCode { stmts: g.out, root: "_root".into() })
+    Ok(ViewCode {
+        stmts: g.out,
+        root: "_root".into(),
+    })
 }
 
 /// Compile a JSX element found inside an expression into an IIFE.
@@ -70,9 +82,20 @@ pub fn gen_element_expr(
     map: &SymbolMap,
     shadows: &HashSet<String>,
 ) -> Result<String, String> {
-    let mut g = Gen { src, map, shadows, out: String::new(), counter: 0, indent: "" };
+    let mut g = Gen {
+        src,
+        map,
+        shadows,
+        out: String::new(),
+        counter: 0,
+        indent: "",
+    };
     let var = g.gen_element(el, None)?;
-    Ok(format!("(() => {{ {} return {}; }})()", g.out.trim_end(), var))
+    Ok(format!(
+        "(() => {{ {} return {}; }})()",
+        g.out.trim_end(),
+        var
+    ))
 }
 
 /// Compile a JSX fragment found inside an expression into an IIFE.
@@ -82,12 +105,22 @@ pub fn gen_fragment_expr(
     map: &SymbolMap,
     shadows: &HashSet<String>,
 ) -> Result<String, String> {
-    let mut g = Gen { src, map, shadows, out: String::new(), counter: 0, indent: "" };
+    let mut g = Gen {
+        src,
+        map,
+        shadows,
+        out: String::new(),
+        counter: 0,
+        indent: "",
+    };
     g.stmt("const _frag = document.createDocumentFragment();");
     for c in fr.children.iter().filter(|c| !is_blank(c)) {
         g.gen_child(c, "_frag")?;
     }
-    Ok(format!("(() => {{ {} return _frag; }})()", g.out.trim_end()))
+    Ok(format!(
+        "(() => {{ {} return _frag; }})()",
+        g.out.trim_end()
+    ))
 }
 
 fn is_blank(child: &JSXChild) -> bool {
@@ -154,11 +187,18 @@ impl<'a> Gen<'a> {
     /// Emit code building `el`; append to `parent` when given. Returns the var.
     fn gen_element(&mut self, el: &JSXElement, parent: Option<&str>) -> Result<String, String> {
         let (name, is_component) = self.name_of(&el.opening_element.name)?;
+        if name == "Keyed" {
+            return self.gen_keyed(el, parent);
+        }
         if is_component {
             return self.gen_component(el, &name, parent);
         }
         let var = self.fresh("el");
-        self.stmt(&format!("const {} = document.createElement({});", var, js_string(&name)));
+        self.stmt(&format!(
+            "const {} = document.createElement({});",
+            var,
+            js_string(&name)
+        ));
         for item in &el.opening_element.attributes {
             self.gen_dom_attr(&var, item)?;
         }
@@ -201,7 +241,10 @@ impl<'a> Gen<'a> {
                     self.stmt(&format!("$.listen({}, {}, {});", var, js_string(&event), e));
                     Ok(())
                 }
-                _ => Err(format!("view: event `{}` needs an expression handler", name)),
+                _ => Err(format!(
+                    "view: event `{}` needs an expression handler",
+                    name
+                )),
             };
         }
         match name.as_str() {
@@ -213,24 +256,31 @@ impl<'a> Gen<'a> {
                 AttrValue::None => return Err("view: `class` needs a value".into()),
             },
             "style" => match value {
-                AttrValue::Str(s) => {
-                    self.stmt(&format!("{}.setAttribute(\"style\", {});", var, js_string(&s)))
-                }
+                AttrValue::Str(s) => self.stmt(&format!(
+                    "{}.setAttribute(\"style\", {});",
+                    var,
+                    js_string(&s)
+                )),
                 AttrValue::Expr(e) => self.stmt(&format!("$.setStyle({}, () => {});", var, e)),
                 AttrValue::None => return Err("view: `style` needs a value".into()),
             },
             // Form state lives on DOM properties, not attributes.
             "value" | "checked" => match value {
-                AttrValue::Expr(e) => {
-                    self.stmt(&format!("$.setProp({}, {}, () => {});", var, js_string(&name), e))
-                }
+                AttrValue::Expr(e) => self.stmt(&format!(
+                    "$.setProp({}, {}, () => {});",
+                    var,
+                    js_string(&name),
+                    e
+                )),
                 AttrValue::Str(s) => self.stmt(&format!("{}.{} = {};", var, name, js_string(&s))),
                 AttrValue::None => self.stmt(&format!("{}.{} = true;", var, name)),
             },
             _ => match value {
-                AttrValue::None => {
-                    self.stmt(&format!("{}.setAttribute({}, \"\");", var, js_string(&name)))
-                }
+                AttrValue::None => self.stmt(&format!(
+                    "{}.setAttribute({}, \"\");",
+                    var,
+                    js_string(&name)
+                )),
                 AttrValue::Str(s) => self.stmt(&format!(
                     "{}.setAttribute({}, {});",
                     var,
@@ -258,7 +308,10 @@ impl<'a> Gen<'a> {
             Some(JSXAttributeValue::StringLiteral(s)) => AttrValue::Str(s.value.to_string()),
             Some(JSXAttributeValue::ExpressionContainer(c)) => match &c.expression {
                 JSXExpression::EmptyExpression(_) => {
-                    return Err(format!("view: attribute `{}` has an empty expression", name));
+                    return Err(format!(
+                        "view: attribute `{}` has an empty expression",
+                        name
+                    ));
                 }
                 expr => AttrValue::Expr(self.rewrite(expr.span())?),
             },
@@ -346,7 +399,10 @@ impl<'a> Gen<'a> {
         let kids: Vec<&JSXChild> = el.children.iter().filter(|c| !is_blank(c)).collect();
         if !kids.is_empty() {
             let cv = self.fresh("c");
-            self.stmt(&format!("const {} = document.createDocumentFragment();", cv));
+            self.stmt(&format!(
+                "const {} = document.createDocumentFragment();",
+                cv
+            ));
             for k in kids {
                 self.gen_child(k, &cv)?;
             }
@@ -354,12 +410,84 @@ impl<'a> Gen<'a> {
         }
 
         let var = self.fresh("el");
-        self.stmt(&format!("const {} = {}({{ {} }});", var, name, props.join(", ")));
+        self.stmt(&format!(
+            "const {} = {}({{ {} }});",
+            var,
+            name,
+            props.join(", ")
+        ));
         if let Some(p) = parent {
             // $.append handles async components (Promise<Node>) with a marker.
             self.stmt(&format!("$.append({}, {});", p, var));
         }
         Ok(var)
+    }
+
+    fn gen_keyed(&mut self, el: &JSXElement, parent: Option<&str>) -> Result<String, String> {
+        let mut each = None;
+        let mut by = None;
+
+        for item in &el.opening_element.attributes {
+            let attr = match item {
+                JSXAttributeItem::Attribute(a) => a,
+                JSXAttributeItem::SpreadAttribute(_) => {
+                    return Err("view: `<Keyed>` does not support spread attributes".into());
+                }
+            };
+            let name = match &attr.name {
+                JSXAttributeName::Identifier(id) => id.name.to_string(),
+                JSXAttributeName::NamespacedName(_) => {
+                    return Err("view: `<Keyed>` attributes must not be namespaced".into());
+                }
+            };
+            match (name.as_str(), self.attr_value(&name, &attr.value)?) {
+                ("each", AttrValue::Expr(e)) => each = Some(e),
+                ("by" | "key", AttrValue::Expr(e)) => by = Some(e),
+                ("each" | "by" | "key", _) => {
+                    return Err(format!(
+                        "view: `<Keyed>` attribute `{}` must be an expression",
+                        name
+                    ));
+                }
+                _ => return Err(format!("view: unsupported `<Keyed>` attribute `{}`", name)),
+            }
+        }
+
+        let each = each.ok_or_else(|| "view: `<Keyed>` needs `each={items}`".to_string())?;
+        let by = by.ok_or_else(|| "view: `<Keyed>` needs `by={item => key}`".to_string())?;
+
+        let kids: Vec<&JSXChild> = el.children.iter().filter(|c| !is_blank(c)).collect();
+        if kids.len() != 1 {
+            return Err("view: `<Keyed>` needs exactly one expression child".into());
+        }
+        let render = match kids[0] {
+            JSXChild::ExpressionContainer(c) => match &c.expression {
+                JSXExpression::EmptyExpression(_) => {
+                    return Err("view: `<Keyed>` render expression cannot be empty".into());
+                }
+                expr => self.rewrite(expr.span())?,
+            },
+            _ => return Err("view: `<Keyed>` child must be a render expression".into()),
+        };
+
+        let host = if let Some(p) = parent {
+            p.to_string()
+        } else {
+            let root = self.fresh("root");
+            self.stmt(&format!(
+                "const {} = document.createDocumentFragment();",
+                root
+            ));
+            root
+        };
+        let marker = self.fresh("m");
+        self.stmt(&format!("const {} = document.createComment(\"\");", marker));
+        self.stmt(&format!("{}.appendChild({});", host, marker));
+        self.stmt(&format!(
+            "$.keyed({}, () => {}, {}, {}, {});",
+            host, each, by, render, marker
+        ));
+        Ok(if parent.is_some() { marker } else { host })
     }
 }
 
@@ -383,8 +511,13 @@ fn event_name(attr: &str) -> Option<String> {
 /// Object key for a component prop: bare identifier when valid, quoted otherwise.
 fn prop_key(name: &str) -> String {
     let valid = !name.is_empty()
-        && name.chars().next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_' || c == '$')
-        && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$');
+        && name
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_alphabetic() || c == '_' || c == '$')
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$');
     if valid {
         name.to_string()
     } else {

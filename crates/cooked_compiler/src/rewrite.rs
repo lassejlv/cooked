@@ -92,7 +92,9 @@ fn rewrite_inner(
     }
 
     // Pass 1: names bound locally inside this fragment shadow reactive ones.
-    let mut shadows = ShadowCollector { names: inherited.clone() };
+    let mut shadows = ShadowCollector {
+        names: inherited.clone(),
+    };
     shadows.visit_program(&ret.program);
 
     // Pass 2: collect rewrite edits.
@@ -122,7 +124,15 @@ fn rewrite_inner(
 fn excerpt(s: &str) -> String {
     let s = s.trim();
     if s.len() > 40 {
-        format!("{}…", &s[..s.char_indices().take(40).last().map(|(i, c)| i + c.len_utf8()).unwrap_or(0)])
+        format!(
+            "{}…",
+            &s[..s
+                .char_indices()
+                .take(40)
+                .last()
+                .map(|(i, c)| i + c.len_utf8())
+                .unwrap_or(0)]
+        )
     } else {
         s.to_string()
     }
@@ -190,8 +200,16 @@ impl<'a, 'm> Visit<'a> for Collector<'m> {
                     (format!("{}.set({}.get() {} (", name, name, base), "))")
                 };
 
-                self.edits.push(Edit { start: left_start, end: right_start, text: prefix });
-                self.edits.push(Edit { start: right_end, end: right_end, text: suffix.to_string() });
+                self.edits.push(Edit {
+                    start: left_start,
+                    end: right_start,
+                    text: prefix,
+                });
+                self.edits.push(Edit {
+                    start: right_end,
+                    end: right_end,
+                    text: suffix.to_string(),
+                });
                 // Only descend into the RHS (the LHS identifier is fully rewritten above).
                 self.visit_expression(&it.right);
                 return;

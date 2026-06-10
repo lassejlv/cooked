@@ -2,12 +2,15 @@ import { describe, it, expect, vi } from "vitest";
 import { signal, effect } from "../src/reactive.js";
 import {
   insert,
+  keyed,
   append,
   setAttr,
   setProp,
   setStyle,
   listen,
   mount,
+  hot,
+  replaceHot,
   withDefaults,
 } from "../src/dom.js";
 
@@ -112,6 +115,66 @@ describe("insert (lists, fragments, markers)", () => {
     expect(spy).toHaveBeenCalledTimes(2);
     dep.set(1); // only the live span's effect re-runs
     expect(spy).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("keyed", () => {
+  it("moves existing nodes when keys reorder", () => {
+    const parent = document.createElement("ul");
+    const items = signal([
+      { id: "a", text: "A" },
+      { id: "b", text: "B" },
+    ]);
+
+    keyed(
+      parent,
+      () => items.get(),
+      (item) => item.id,
+      (item) => {
+        const li = document.createElement("li");
+        li.textContent = item.text;
+        return li;
+      },
+    );
+
+    const firstA = parent.querySelectorAll("li")[0];
+    const firstB = parent.querySelectorAll("li")[1];
+    items.set([
+      { id: "b", text: "B" },
+      { id: "a", text: "A" },
+    ]);
+
+    const next = parent.querySelectorAll("li");
+    expect([...next].map((node) => node.textContent)).toEqual(["B", "A"]);
+    expect(next[0]).toBe(firstB);
+    expect(next[1]).toBe(firstA);
+  });
+
+  it("disposes effects for removed keys", () => {
+    const parent = document.createElement("ul");
+    const items = signal([{ id: "a" }, { id: "b" }]);
+    const dep = signal(0);
+    const spy = vi.fn();
+
+    keyed(
+      parent,
+      () => items.get(),
+      (item) => item.id,
+      (item) => {
+        const li = document.createElement("li");
+        effect(() => {
+          spy(item.id, dep.get());
+          li.textContent = `${item.id}:${dep.get()}`;
+        });
+        return li;
+      },
+    );
+
+    expect(spy).toHaveBeenCalledTimes(2);
+    items.set([{ id: "b" }]);
+    dep.set(1);
+    expect(parent.textContent).toBe("b:1");
+    expect(spy.mock.calls.map(([id]) => id)).toEqual(["a", "b", "b"]);
   });
 });
 
@@ -260,5 +323,30 @@ describe("listen + mount", () => {
     expect(btn.textContent).toBe("n: 0");
     btn.dispatchEvent(new Event("click"));
     expect(btn.textContent).toBe("n: 1");
+  });
+});
+
+describe("hot component replacement", () => {
+  it("remounts active instances when a module export is replaced", () => {
+    const First = hot(() => {
+      const p = document.createElement("p");
+      p.textContent = "first";
+      return p;
+    }, "/src/App.ck", "App");
+    const Second = () => {
+      const p = document.createElement("p");
+      p.textContent = "second";
+      return p;
+    };
+
+    const root = document.createElement("div");
+    const dispose = mount(First, root);
+    expect(root.textContent).toBe("first");
+
+    replaceHot("/src/App.ck", { App: Second });
+    expect(root.textContent).toBe("second");
+
+    dispose();
+    expect(root.textContent).toBe("");
   });
 });

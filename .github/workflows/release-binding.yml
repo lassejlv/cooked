@@ -76,6 +76,9 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # Scoped packages default to restricted — force public for the
+          # per-platform packages napi publishes internally.
+          NPM_CONFIG_ACCESS: public
         run: |
           npx napi prepublish -t npm --skip-gh-release
           npm publish --access public

@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "allowArbitraryExtensions": true,
+    "rootDirs": [".", "./node_modules/.cooked/types"],
+    "types": ["vite/client"]
+  },
+  "include": ["src", "node_modules/.cooked/types/cooked-routes.d.ts"]
+}

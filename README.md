@@ -36,6 +36,15 @@ export fn Counter(label: string = "Count") {
 - Rust `tower-lsp` language server for completion, hover, diagnostics, symbols, and CSS help.
 - Tiny runtime and direct DOM output.
 
+## Quick start
+
+```bash
+npm create cooked my-app
+cd my-app && npm install && npm run dev
+```
+
+Templates: `ssr` (default — SSR, API routes, server functions) and `spa`.
+
 ## Docs
 
 - [Docs index](./docs/README.md)

@@ -1,6 +1,6 @@
 # @cookedjs/binding
 
-Native [Cooked](https://github.com/cookedjs/cooked) compiler bindings
+Native [Cooked](https://github.com/lassejlv/cooked) compiler bindings
 (napi-rs). Used internally by `@cookedjs/vite-plugin-cooked` — you normally
 don't install this directly.
 

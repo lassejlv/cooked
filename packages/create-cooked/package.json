@@ -1,0 +1,20 @@
+{
+  "name": "create-cooked",
+  "version": "0.1.0",
+  "description": "Scaffold a Cooked project: `npm create cooked`.",
+  "type": "module",
+  "bin": {
+    "create-cooked": "./index.js"
+  },
+  "files": ["index.js", "templates"],
+  "license": "MIT",
+  "author": "Lasse Vestergaard",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lassejlv/cooked"
+  },
+  "keywords": ["cooked", "create", "scaffold", "vite", "ssr"],
+  "engines": {
+    "node": ">=18"
+  }
+}

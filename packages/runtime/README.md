@@ -1,6 +1,6 @@
 # @cookedjs/cooked
 
-Runtime for [Cooked](https://github.com/cookedjs/cooked) — a compiled UI
+Runtime for [Cooked](https://github.com/lassejlv/cooked) — a compiled UI
 language with fine-grained reactivity, zero virtual DOM, a built-in type-safe
 file-based router, and minimal SSR.
 

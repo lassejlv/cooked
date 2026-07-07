@@ -1,0 +1,19 @@
+{
+  "name": "cooked-app",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@cookedjs/cooked": "^0.1.0"
+  },
+  "devDependencies": {
+    "@cookedjs/vite-plugin-cooked": "^0.1.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3"
+  }
+}

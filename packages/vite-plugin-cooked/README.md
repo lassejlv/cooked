@@ -1,6 +1,6 @@
 # @cookedjs/vite-plugin-cooked
 
-Vite plugin for [Cooked](https://github.com/cookedjs/cooked): compiles `.ck`
+Vite plugin for [Cooked](https://github.com/lassejlv/cooked): compiles `.ck`
 files via the native Rust compiler and wires up the framework.
 
 ```bash

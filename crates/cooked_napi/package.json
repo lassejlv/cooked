@@ -1,13 +1,17 @@
 {
   "name": "@cookedjs/binding",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Native Cooked compiler bindings (napi-rs).",
   "main": "index.js",
   "types": "index.d.ts",
   "napi": {
     "name": "cooked-binding",
     "triples": {
-      "defaults": true
+      "defaults": true,
+      "additional": [
+        "aarch64-apple-darwin",
+        "aarch64-unknown-linux-gnu"
+      ]
     }
   },
   "files": [
@@ -26,7 +30,7 @@
   "author": "Lasse Vestergaard",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cookedjs/cooked"
+    "url": "https://github.com/lassejlv/cooked"
   },
   "keywords": [
     "cooked",

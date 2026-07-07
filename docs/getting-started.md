@@ -1,5 +1,14 @@
 # Getting started
 
+## New project (published packages)
+
+```bash
+npm create cooked my-app
+```
+
+Scaffolds a ready-to-run app using `@cookedjs/cooked` + `@cookedjs/vite-plugin-cooked` from npm. The rest of this guide covers working in this repo.
+
+
 [Docs index](./README.md) -> Getting started
 
 ## Install

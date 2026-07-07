@@ -1,6 +1,6 @@
 {
   "name": "@cookedjs/binding",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Native Cooked compiler bindings (napi-rs).",
   "main": "index.js",
   "types": "index.d.ts",

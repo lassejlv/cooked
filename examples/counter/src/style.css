@@ -1,0 +1,4 @@
+@import "tailwindcss";
+
+/* Tailwind's scanner doesn't know the .ck extension — point it there. */
+@source "./**/*.ck";

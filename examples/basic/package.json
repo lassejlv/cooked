@@ -12,9 +12,7 @@
     "cooked": "workspace:*"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.3.2",
     "happy-dom": "^15.11.6",
-    "tailwindcss": "^4.3.2",
     "typescript": "^5.7.2",
     "vite": "^6.0.3",
     "vite-plugin-cooked": "workspace:*",

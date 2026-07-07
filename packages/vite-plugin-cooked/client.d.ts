@@ -6,3 +6,7 @@ declare module "*.ck" {
   const component: CookedComponent;
   export default component;
 }
+
+declare module "virtual:cooked-routes" {
+  export const routes: import("cooked/router").RouteDefinition[];
+}

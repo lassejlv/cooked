@@ -16,3 +16,4 @@ crates/cooked_napi/index.d.ts
 # misc
 .DS_Store
 *.log
+editors/zed/target

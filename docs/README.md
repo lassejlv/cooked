@@ -8,6 +8,7 @@ state, and zero virtual DOM.
 - [Getting started](./getting-started.md) - install, build, run the example app.
 - [Language guide](./language.md) - `.ck` components, JSX, reactivity, lists, props.
 - [State management](./state.md) - built-in stores, atoms, selectors, actions.
+- [Router](./router.md) - type-safe file-based routing, layouts, params, code splitting.
 - [Tooling](./tooling.md) - Vite plugin, TypeScript declarations, HMR, source maps.
 - [Language server](./language-server.md) - editor completions, hover, diagnostics, CSS, TypeScript service.
 - [Architecture](./architecture.md) - compiler/runtime layout and data flow.

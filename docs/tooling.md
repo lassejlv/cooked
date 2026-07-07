@@ -33,11 +33,54 @@ For TypeScript projects, add:
 /// <reference types="vite-plugin-cooked/client" />
 ```
 
-The Vite plugin emits sibling `.d.ck.ts` files next to compiled `.ck` modules by
-default. Set `cooked({ declarations: false })` to disable this.
+The Vite plugin emits `.d.ck.ts` files into `node_modules/.cooked/types/`
+(mirroring your source tree) so generated files stay out of your project. Point
+TypeScript at them with `rootDirs` in `tsconfig.json`:
+
+```jsonc
+{
+  "compilerOptions": {
+    "allowArbitraryExtensions": true,
+    "rootDirs": [".", "./node_modules/.cooked/types"]
+  }
+}
+```
+
+Set `cooked({ declarations: false })` to disable emission, or
+`cooked({ declarationsDir: "..." })` to change the output location.
+
+## File-based routing
+
+The plugin scans `src/routes/` (configurable via `cooked({ routesDir })`) and
+serves the route table through the `virtual:cooked-routes` module, plus a
+generated `cooked-routes.d.ts` that makes `Link`/`navigate` path- and
+param-checked. See [Router](./router.md).
 
 Named component exports get generated declarations from `.ck` prop annotations.
 Props without annotations fall back to `unknown`.
+
+## Tailwind CSS
+
+Tailwind v4 works out of the box alongside the Cooked plugin:
+
+```ts
+// vite.config.ts
+import cooked from "vite-plugin-cooked";
+import tailwindcss from "@tailwindcss/vite";
+
+export default defineConfig({ plugins: [cooked(), tailwindcss()] });
+```
+
+```css
+/* src/style.css */
+@import "tailwindcss";
+
+/* Tailwind's scanner doesn't know the .ck extension — point it there. */
+@source "./**/*.ck";
+```
+
+Import the CSS from your entry module and use utility classes in `.ck`
+markup as usual.
 
 ## Source maps and diagnostics
 

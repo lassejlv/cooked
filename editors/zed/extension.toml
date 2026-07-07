@@ -1,0 +1,16 @@
+id = "cooked"
+name = "Cooked"
+description = "Cooked language support (.ck files) with the Cooked language server."
+version = "0.0.1"
+schema_version = 1
+authors = ["Lasse"]
+repository = "https://github.com/lasse/cooked"
+
+[language_servers.cooked-lsp]
+name = "Cooked LSP"
+languages = ["Cooked"]
+
+[grammars.tsx]
+repository = "https://github.com/zed-industries/tree-sitter-typescript"
+rev = "e2c53597d6a5d9cf7bbe8dccde576fe1e46c5899"
+path = "tsx"

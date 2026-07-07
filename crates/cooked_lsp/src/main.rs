@@ -311,8 +311,10 @@ async fn typescript_diagnostics(uri: &Url, text: &str) -> Vec<Diagnostic> {
 }
 
 fn ignored_typescript_diagnostic(code: u32) -> bool {
-    // Cooked's JSX transform does not require React-style JSX imports.
-    matches!(code, 7026 | 17004 | 2875)
+    // 7026/17004/2875: Cooked's JSX transform does not require React-style JSX
+    // imports. 7043-7050: "implicitly any, but a better type may be inferred"
+    // suggestions — Cooked types are optional, so these are noise.
+    matches!(code, 7026 | 17004 | 2875 | 7043..=7050)
 }
 
 async fn typescript_query(
@@ -332,38 +334,96 @@ async fn typescript_query(
         trigger_character: None,
     };
     let payload = serde_json::to_vec(&request).ok()?;
-    for runner in typescript_runners() {
-        if let Some(response) = run_typescript_service(&runner, &payload).await {
-            if response.ok.unwrap_or(false) {
-                return Some(response);
+    let response = run_typescript_service(&payload).await?;
+    if response.ok.unwrap_or(false) {
+        Some(response)
+    } else {
+        None
+    }
+}
+
+/// A long-lived typescript_service.mjs child. Spawned once, reused for every
+/// request; the TypeScript LanguageService inside stays warm between calls.
+struct TsProcess {
+    child: tokio::process::Child,
+    stdin: tokio::process::ChildStdin,
+    stdout: tokio::io::BufReader<tokio::process::ChildStdout>,
+}
+
+static TS_PROCESS: std::sync::LazyLock<tokio::sync::Mutex<Option<TsProcess>>> =
+    std::sync::LazyLock::new(|| tokio::sync::Mutex::new(None));
+
+async fn run_typescript_service(payload: &[u8]) -> Option<TsResponse> {
+    let mut guard = TS_PROCESS.lock().await;
+    // Two attempts: a dead/hung process is killed and respawned once.
+    for _ in 0..2 {
+        if guard.is_none() {
+            *guard = spawn_ts_process().await;
+        }
+        let process = guard.as_mut()?;
+        match ts_process_request(process, payload).await {
+            Some(response) => return Some(response),
+            None => {
+                let _ = process.child.start_kill();
+                *guard = None;
             }
         }
     }
     None
 }
 
-async fn run_typescript_service(runner: &str, payload: &[u8]) -> Option<TsResponse> {
+async fn spawn_ts_process() -> Option<TsProcess> {
     let script = typescript_service_path();
-    let mut child = Command::new(runner)
-        .arg(script)
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null())
-        .spawn()
-        .ok()?;
+    for runner in typescript_runners() {
+        let Ok(mut child) = Command::new(&runner)
+            .arg(&script)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+        else {
+            continue;
+        };
+        let Some(stdin) = child.stdin.take() else {
+            continue;
+        };
+        let Some(stdout) = child.stdout.take() else {
+            continue;
+        };
+        let mut process = TsProcess {
+            child,
+            stdin,
+            stdout: tokio::io::BufReader::new(stdout),
+        };
+        // Verify the runner can actually execute the script (module resolution,
+        // TypeScript import, ...) before committing to it.
+        if ts_process_request(&mut process, br#"{"action":"ping"}"#)
+            .await
+            .is_some()
+        {
+            return Some(process);
+        }
+        let _ = process.child.start_kill();
+    }
+    None
+}
 
-    let mut stdin = child.stdin.take()?;
-    stdin.write_all(payload).await.ok()?;
-    drop(stdin);
+async fn ts_process_request(process: &mut TsProcess, payload: &[u8]) -> Option<TsResponse> {
+    use tokio::io::AsyncBufReadExt;
 
-    let output = timeout(Duration::from_secs(2), child.wait_with_output())
+    process.stdin.write_all(payload).await.ok()?;
+    process.stdin.write_all(b"\n").await.ok()?;
+    process.stdin.flush().await.ok()?;
+
+    let mut line = String::new();
+    let read = timeout(Duration::from_secs(10), process.stdout.read_line(&mut line))
         .await
         .ok()?
         .ok()?;
-    if !output.status.success() {
-        return None;
+    if read == 0 {
+        return None; // process exited
     }
-    serde_json::from_slice(&output.stdout).ok()
+    serde_json::from_str(&line).ok()
 }
 
 fn typescript_service_path() -> PathBuf {
@@ -741,23 +801,10 @@ fn css_diagnostics(text: &str) -> Vec<Diagnostic> {
     diagnostics
 }
 
-fn lightweight_ts_diagnostics(text: &str) -> Vec<Diagnostic> {
-    let mut diagnostics = vec![];
-    for (line_idx, line) in text.lines().enumerate() {
-        if line.contains("console.log(") {
-            diagnostics.push(Diagnostic {
-                range: Range::new(
-                    Position::new(line_idx as u32, 0),
-                    Position::new(line_idx as u32, line.len() as u32),
-                ),
-                severity: Some(DiagnosticSeverity::HINT),
-                source: Some("cooked-ts".into()),
-                message: "Debug logging in component code".into(),
-                ..Diagnostic::default()
-            });
-        }
-    }
-    diagnostics
+fn lightweight_ts_diagnostics(_text: &str) -> Vec<Diagnostic> {
+    // Previously flagged every `console.log` as "Debug logging in component
+    // code" — pure noise for legitimate logging. Kept as an extension point.
+    vec![]
 }
 
 fn object_keys(line: &str) -> Vec<String> {
@@ -830,6 +877,50 @@ mod tests {
         let items = typescript_completions(&uri, text, Position::new(1, 18)).await;
         assert!(items.iter().any(|item| item.label == "toUpperCase"));
         assert!(items.iter().any(|item| item.label == "trim"));
+    }
+
+    #[tokio::test]
+    async fn typescript_service_accepts_full_cooked_syntax() {
+        // Regression: `effect { }` blocks, nested `fn`, and multi-param
+        // components used to produce cascading TS syntax errors.
+        let uri = Url::parse("file:///tmp/Full.ck").unwrap();
+        let text = "export fn Counter(label: string = \"Count\", onDone) {\n  let mut count = 0\n  let doubled => count * 2\n\n  effect {\n    console.log(\"count is\", count)\n  }\n\n  fn inc() {\n    count += 1\n  }\n\n  rt (\n    <div>\n      <h1>{label}: {count} ({doubled})</h1>\n      <button onClick={inc}>+</button>\n      <button onClick={onDone}>done</button>\n    </div>\n  )\n}\n";
+        let diagnostics = typescript_diagnostics(&uri, text).await;
+        assert!(
+            diagnostics.is_empty(),
+            "expected no diagnostics, got: {:?}",
+            diagnostics
+                .iter()
+                .map(|d| format!("{:?} {}", d.range, d.message))
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[tokio::test]
+    async fn typescript_service_checks_route_registry() {
+        // Uses the counter example's generated cooked-routes.d.ts; skip when
+        // the example hasn't been built yet (fresh clone).
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../examples/counter")
+            .canonicalize()
+            .unwrap();
+        if !root
+            .join("node_modules/.cooked/types/cooked-routes.d.ts")
+            .exists()
+        {
+            return;
+        }
+        let layout = root.join("src/routes/__layout.ck");
+        let uri = Url::from_file_path(&layout).unwrap();
+        let text = "import { Link } from \"cooked/router\"\n\nexport fn Layout() {\n  rt (\n    <nav>\n      <Link to=\"/nope\">bad</Link>\n    </nav>\n  )\n}\n";
+        let diagnostics = typescript_diagnostics(&uri, text).await;
+        assert!(
+            diagnostics
+                .iter()
+                .any(|d| d.message.contains("not assignable to type 'RoutePath'")),
+            "expected a RoutePath error, got: {:?}",
+            diagnostics.iter().map(|d| &d.message).collect::<Vec<_>>()
+        );
     }
 
     #[tokio::test]

@@ -14,6 +14,10 @@
     "./runtime": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./router": {
+      "types": "./dist/router.d.ts",
+      "default": "./dist/router.js"
     }
   },
   "files": ["dist"],

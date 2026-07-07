@@ -1,7 +1,6 @@
 import { defineConfig } from "vite";
 import cooked from "vite-plugin-cooked";
-import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
-  plugins: [cooked(), tailwindcss()],
+  plugins: [cooked()],
 });

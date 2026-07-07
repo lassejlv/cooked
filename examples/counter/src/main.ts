@@ -1,12 +1,11 @@
-import { Counter } from "./Counter.ck";
-import { TodoApp } from "./TodoApp.ck";
-import { Greeting } from "./Greeting.ck";
+import "./style.css";
 import { mount } from "cooked";
+import { createRouter } from "cooked/router";
+import { routes } from "virtual:cooked-routes";
 
 const app = document.getElementById("app");
 
 if (app) {
-  mount(Greeting, app, { name: "cook" });
-  mount(Counter, app, { label: "Count" });
-  mount(TodoApp, app);
+  const router = createRouter({ routes });
+  mount(router.view, app);
 }

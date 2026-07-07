@@ -27,6 +27,8 @@ cargo run -p cooked_lsp --bin cooked-lsp
   `Keyed`.
 - Runtime completions for stores, atoms, signals, memos, effects, and batches.
 - CSS property completions and warnings inside `style={{ ... }}` objects.
+- Route-aware `Link`/`navigate` checking and path completions, powered by the
+  generated `cooked-routes.d.ts` registry (run Vite once to generate it).
 - Document symbols and local definition lookup for top-level `.ck` exports.
 
 ## TypeScript Service
@@ -50,6 +52,43 @@ COOKED_TYPESCRIPT_SERVICE=/absolute/path/to/typescript_service.mjs pnpm lsp
 
 If neither `bun` nor `node` can run the helper, the LSP still serves Cooked
 compiler diagnostics, snippets, CSS completions, symbols, and local hovers.
+
+## Zed
+
+A dev extension lives in [`editors/zed`](../editors/zed). It registers the
+`.ck` language (highlighted with the tsx tree-sitter grammar) and launches
+`cooked-lsp` — found on `PATH` first (`cargo install --path crates/cooked_lsp`),
+falling back to `target/release/cooked-lsp` in the worktree.
+
+Install:
+
+1. `cargo install --path crates/cooked_lsp`
+2. In Zed: `cmd-shift-p` -> `zed: install dev extension` -> select `editors/zed`
+
+The extension compiles locally on install (needs the `wasm32-wasip1` rust
+target: `rustup target add wasm32-wasip1`).
+
+### Tailwind CSS completions
+
+Zed's built-in `tailwindcss-language-server` handles Tailwind completions in
+`.ck` files. Enable it per project in `.zed/settings.json` (this repo ships
+one):
+
+```json
+{
+  "languages": {
+    "Cooked": { "language_servers": ["tailwindcss-language-server", "..."] }
+  },
+  "lsp": {
+    "tailwindcss-language-server": {
+      "settings": { "includeLanguages": { "cooked": "html" } }
+    }
+  }
+}
+```
+
+`"..."` keeps the Cooked LSP active alongside it. The `cooked` key is Zed's
+LSP language id for the Cooked language (lowercased language name).
 
 ## Validation
 

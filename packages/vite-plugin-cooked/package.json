@@ -1,6 +1,6 @@
 {
-  "name": "vite-plugin-cooked",
-  "version": "0.0.1",
+  "name": "@cookedjs/vite-plugin-cooked",
+  "version": "0.1.0",
   "description": "Vite plugin for the Cooked language (.ck).",
   "type": "module",
   "main": "./dist/index.js",
@@ -23,7 +23,8 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@cooked/binding": "workspace:*"
+    "@cookedjs/binding": "workspace:*",
+    "@cookedjs/cooked": "workspace:*"
   },
   "peerDependencies": {
     "vite": ">=5"
@@ -32,5 +33,19 @@
     "@types/node": "^25.9.2",
     "typescript": "^5.7.2",
     "vite": "^6.0.3"
-  }
+  },
+  "license": "MIT",
+  "author": "Lasse Vestergaard",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cookedjs/cooked"
+  },
+  "keywords": [
+    "cooked",
+    "compiler",
+    "reactive",
+    "vite",
+    "ssr",
+    "framework"
+  ]
 }

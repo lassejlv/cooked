@@ -1,1 +1,1 @@
-/// <reference types="vite-plugin-cooked/client" />
+/// <reference types="@cookedjs/vite-plugin-cooked/client" />

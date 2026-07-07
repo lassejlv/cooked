@@ -293,6 +293,7 @@ impl Parser {
             imports: vec![],
             components: vec![],
             functions: vec![],
+            raws: vec![],
         };
         self.skip_ws();
         while !self.eof() {
@@ -304,6 +305,9 @@ impl Parser {
                     line.pop();
                 }
                 file.imports.push(line);
+            } else if self.at_export_binding() {
+                let raw = self.parse_raw_export()?;
+                file.raws.push(raw);
             } else if self.at_keyword("export") || self.at_keyword("async") || self.at_keyword("fn")
             {
                 self.parse_top_fn(&mut file)?;
@@ -316,6 +320,76 @@ impl Parser {
             self.skip_ws();
         }
         Ok(file)
+    }
+
+    /// At `export const|let|var`? (as opposed to `export [async] fn`)
+    fn at_export_binding(&mut self) -> bool {
+        if !self.at_keyword("export") {
+            return false;
+        }
+        let save = self.pos;
+        self.pos += "export".chars().count();
+        self.skip_ws();
+        let hit = self.at_keyword("const") || self.at_keyword("let") || self.at_keyword("var");
+        self.pos = save;
+        hit
+    }
+
+    /// `export const Name[: Type] = <expr>` — passed through verbatim (server
+    /// functions and other module-level bindings). The expression may continue
+    /// across newlines through leading-`.` method chains. The binding's type
+    /// annotation is stripped (the emitted module is plain JS).
+    fn parse_raw_export(&mut self) -> PResult<String> {
+        let mut out = String::new();
+        self.eat_keyword("export");
+        out.push_str("export ");
+        self.skip_ws();
+        for kw in ["const", "let", "var"] {
+            if self.eat_keyword(kw) {
+                out.push_str(kw);
+                out.push(' ');
+                break;
+            }
+        }
+        self.skip_ws();
+        let name = self.parse_ident()?;
+        out.push_str(&name);
+        self.skip_ws();
+        if self.peek() == ':' {
+            // Drop the type annotation: capture until the top-level `=`.
+            self.pos += 1;
+            let _annotation = self.capture(&['='], true);
+        }
+        if self.peek() != '=' {
+            return Err(format!(
+                "expected `=` in `export const {}`, found '{}'",
+                name,
+                self.describe_here()
+            ));
+        }
+        self.pos += 1;
+        out.push_str(" = ");
+
+        loop {
+            let part = self.capture(&[';', '\n'], true);
+            out.push_str(part.trim_end());
+            if self.peek() == ';' {
+                self.pos += 1;
+                break;
+            }
+            // Newline (or EOF): the expression continues only via a `.` chain.
+            let save = self.pos;
+            self.skip_ws();
+            if self.peek() == '.' {
+                out.push('\n');
+                out.push_str("  ");
+                continue;
+            }
+            self.pos = save;
+            break;
+        }
+        out.push(';');
+        Ok(out)
     }
 
     /// `[export] [async] fn Name(params) { ... }` — capitalized names are
@@ -389,7 +463,7 @@ impl Parser {
                 comp.props.push(self.parse_prop()?);
             } else if self.at_keyword("let") {
                 self.parse_let(comp)?;
-            } else if self.at_keyword("fn") {
+            } else if self.at_keyword("fn") || self.at_async_fn() {
                 let f = self.parse_fn()?;
                 comp.items.push(Item::Fn(f));
             } else if self.at_keyword("effect") {
@@ -508,7 +582,24 @@ impl Parser {
         Ok(())
     }
 
+    /// At `async fn`? (nested inside a component body)
+    fn at_async_fn(&mut self) -> bool {
+        if !self.at_keyword("async") {
+            return false;
+        }
+        let save = self.pos;
+        self.pos += "async".chars().count();
+        self.skip_ws();
+        let hit = self.at_keyword("fn");
+        self.pos = save;
+        hit
+    }
+
     fn parse_fn(&mut self) -> PResult<Func> {
+        let is_async = self.eat_keyword("async");
+        if is_async {
+            self.skip_ws();
+        }
         self.eat_keyword("fn");
         self.skip_inline();
         let name = self.parse_ident()?;
@@ -519,7 +610,12 @@ impl Parser {
         self.skip_ws();
         self.take_return_type();
         let body = self.capture_block_inner()?;
-        Ok(Func { name, params, body })
+        Ok(Func {
+            name,
+            is_async,
+            params,
+            body,
+        })
     }
 
     /// Capture an optional `-> Type` or `: Type` return annotation before `{`.

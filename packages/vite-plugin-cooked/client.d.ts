@@ -8,5 +8,13 @@ declare module "*.ck" {
 }
 
 declare module "virtual:cooked-routes" {
-  export const routes: import("cooked/router").RouteDefinition[];
+  export const routes: import("@cookedjs/cooked/router").RouteDefinition[];
+}
+
+declare module "virtual:cooked-api-routes" {
+  export const apiRoutes: import("@cookedjs/cooked/router").RouteDefinition[];
+}
+
+declare module "virtual:cooked-server-fns" {
+  export const serverFns: Record<string, () => Promise<Record<string, unknown>>>;
 }

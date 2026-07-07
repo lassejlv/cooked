@@ -27,8 +27,8 @@ matched leaf component receives the params as a `params` prop.
 
 ```ts
 // src/main.ts
-import { mount } from "cooked";
-import { createRouter } from "cooked/router";
+import { mount } from "@cookedjs/cooked";
+import { createRouter } from "@cookedjs/cooked/router";
 import { routes } from "virtual:cooked-routes";
 
 const router = createRouter({ routes });
@@ -44,7 +44,7 @@ rendered when nothing matches).
 page as `children`:
 
 ```rust
-import { Link } from "cooked/router"
+import { Link } from "@cookedjs/cooked/router"
 
 export fn Layout() {
   rt (
@@ -64,7 +64,7 @@ Nested directories nest their layouts (outermost first).
 ## Navigation
 
 ```ts
-import { navigate, useParams, useSearch, usePathname } from "cooked/router";
+import { navigate, useParams, useSearch, usePathname } from "@cookedjs/cooked/router";
 
 navigate("/posts/$id", { params: { id: "7" }, search: { tab: "comments" } });
 navigate("/about", { replace: true });
@@ -80,7 +80,7 @@ modified clicks and `target` fall through to the browser.
 ## Type safety
 
 The plugin writes `node_modules/.cooked/types/cooked-routes.d.ts`, which
-registers every route with `cooked/router`:
+registers every route with `@cookedjs/cooked/router`:
 
 ```ts
 navigate("/nope");                                 // error: unknown route

@@ -13,9 +13,9 @@ Cooked currently uses `pnpm@11.5.2` in this repository.
 ## Build the local packages
 
 ```bash
-pnpm --filter @cooked/binding build:debug
-pnpm --filter cooked build
-pnpm --filter vite-plugin-cooked build
+pnpm --filter @cookedjs/binding build:debug
+pnpm --filter @cookedjs/cooked build
+pnpm --filter @cookedjs/vite-plugin-cooked build
 ```
 
 Or run the root build:
@@ -27,7 +27,7 @@ pnpm build
 ## Run the example app
 
 ```bash
-pnpm --filter @cooked/example-counter dev
+pnpm --filter @cookedjs/example-counter dev
 ```
 
 The example lives in [`examples/counter`](../examples/counter).

@@ -11,6 +11,9 @@ pub struct File {
     /// Lowercase top-level `fn`s: plain helper functions, passed through
     /// (types stripped, JSX-in-expressions compiled).
     pub functions: Vec<RawFn>,
+    /// Top-level `export const/let/var ...` statements (e.g. server functions),
+    /// passed through verbatim (type annotation on the binding stripped).
+    pub raws: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -61,6 +64,7 @@ pub struct Binding {
 #[derive(Debug, Clone)]
 pub struct Func {
     pub name: String,
+    pub is_async: bool,
     pub params: String, // raw param list text (types stripped at codegen)
     pub body: String,   // raw statement-block body
 }

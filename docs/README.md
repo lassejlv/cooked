@@ -9,6 +9,7 @@ state, and zero virtual DOM.
 - [Language guide](./language.md) - `.ck` components, JSX, reactivity, lists, props.
 - [State management](./state.md) - built-in stores, atoms, selectors, actions.
 - [Router](./router.md) - type-safe file-based routing, layouts, params, code splitting.
+- [Server rendering](./ssr.md) - SSR, API routes, type-safe server functions.
 - [Tooling](./tooling.md) - Vite plugin, TypeScript declarations, HMR, source maps.
 - [Language server](./language-server.md) - editor completions, hover, diagnostics, CSS, TypeScript service.
 - [Architecture](./architecture.md) - compiler/runtime layout and data flow.
@@ -25,7 +26,8 @@ state, and zero virtual DOM.
 |------|------|
 | [`crates/cooked_compiler`](../crates/cooked_compiler) | Rust parser, reactive rewriter, JSX codegen |
 | [`crates/cooked_lsp`](../crates/cooked_lsp) | `tower-lsp` language server with TypeScript service integration |
-| [`crates/cooked_napi`](../crates/cooked_napi) | napi-rs binding published as `@cooked/binding` |
+| [`crates/cooked_napi`](../crates/cooked_napi) | napi-rs binding published as `@cookedjs/binding` |
 | [`packages/runtime`](../packages/runtime) | `cooked` runtime: reactivity, DOM helpers, stores |
 | [`packages/vite-plugin-cooked`](../packages/vite-plugin-cooked) | Vite transform plugin for `.ck` |
 | [`examples/counter`](../examples/counter) | Counter/todo/async greeting example and tests |
+| [`examples/ssr`](../examples/ssr) | Server rendering, API routes, server functions |

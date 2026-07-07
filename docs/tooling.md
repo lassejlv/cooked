@@ -9,7 +9,7 @@ used by `vite-plugin-cooked`.
 
 ```ts
 import { defineConfig } from "vite";
-import cooked from "vite-plugin-cooked";
+import cooked from "@cookedjs/vite-plugin-cooked";
 
 export default defineConfig({
   plugins: [cooked()],
@@ -30,7 +30,7 @@ cooked({
 For TypeScript projects, add:
 
 ```ts
-/// <reference types="vite-plugin-cooked/client" />
+/// <reference types="@cookedjs/vite-plugin-cooked/client" />
 ```
 
 The Vite plugin emits `.d.ck.ts` files into `node_modules/.cooked/types/`
@@ -65,7 +65,7 @@ Tailwind v4 works out of the box alongside the Cooked plugin:
 
 ```ts
 // vite.config.ts
-import cooked from "vite-plugin-cooked";
+import cooked from "@cookedjs/vite-plugin-cooked";
 import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({ plugins: [cooked(), tailwindcss()] });

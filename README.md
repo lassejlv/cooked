@@ -31,6 +31,7 @@ export fn Counter(label: string = "Count") {
 - Fine-grained signals, effects, derived values, keyed lists, and zero virtual DOM.
 - Built-in typed stores, atoms, selectors, and actions.
 - Type-safe file-based router with layouts, params, and per-route code splitting.
+- Built-in SSR: server rendering, API routes, and secure type-safe server functions.
 - Vite plugin with source maps, generated `.d.ck.ts` files, and HMR remounting.
 - Rust `tower-lsp` language server for completion, hover, diagnostics, symbols, and CSS help.
 - Tiny runtime and direct DOM output.
@@ -42,6 +43,7 @@ export fn Counter(label: string = "Count") {
 - [Language guide](./docs/language.md)
 - [State management](./docs/state.md)
 - [Router](./docs/router.md)
+- [Server rendering](./docs/ssr.md)
 - [Tooling](./docs/tooling.md)
 - [Language server](./docs/language-server.md)
 - [Architecture](./docs/architecture.md)
@@ -52,7 +54,7 @@ export fn Counter(label: string = "Count") {
 ```bash
 pnpm install
 pnpm build
-pnpm --filter @cooked/example-counter dev
+pnpm --filter @cookedjs/example-counter dev
 ```
 
 See [Getting started](./docs/getting-started.md) for the full local workflow.

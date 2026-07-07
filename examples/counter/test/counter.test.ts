@@ -2,7 +2,7 @@ import { test, expect } from "vitest";
 import { Counter } from "../src/Counter.ck";
 import { TodoApp } from "../src/TodoApp.ck";
 import { Greeting } from "../src/Greeting.ck";
-import { mount } from "cooked";
+import { mount } from "@cookedjs/cooked";
 
 const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 

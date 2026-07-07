@@ -1,0 +1,21 @@
+{
+  "name": "@cookedjs/example-ssr",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "start": "node server.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@cookedjs/cooked": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3",
+    "@cookedjs/vite-plugin-cooked": "workspace:*",
+    "vitest": "^2.1.8"
+  }
+}

@@ -14,11 +14,11 @@ pnpm check
 ## Package-specific commands
 
 ```bash
-pnpm --filter @cooked/binding build:debug
-pnpm --filter cooked build
-pnpm --filter vite-plugin-cooked build
+pnpm --filter @cookedjs/binding build:debug
+pnpm --filter @cookedjs/cooked build
+pnpm --filter @cookedjs/vite-plugin-cooked build
 pnpm build:lsp
-pnpm --filter @cooked/example-counter dev
+pnpm --filter @cookedjs/example-counter dev
 pnpm lsp
 ```
 

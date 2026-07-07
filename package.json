@@ -5,16 +5,16 @@
   "description": "Cooked — a Svelte/Solid-style compiled UI language. Rust x TypeScript.",
   "type": "module",
   "scripts": {
-    "build:compiler": "pnpm --filter @cooked/binding build",
+    "build:compiler": "pnpm --filter @cookedjs/binding build",
     "build:lsp": "cargo build -p cooked_lsp --bin cooked-lsp",
-    "build:plugin": "pnpm --filter vite-plugin-cooked build",
-    "build:runtime": "pnpm --filter cooked build",
+    "build:plugin": "pnpm --filter @cookedjs/vite-plugin-cooked build",
+    "build:runtime": "pnpm --filter @cookedjs/cooked build",
     "build": "pnpm build:runtime && pnpm build:compiler && pnpm build:plugin && pnpm build:lsp",
     "check": "cargo fmt --check && cargo check && cargo test -p cooked_compiler && cargo test -p cooked_lsp && pnpm build && pnpm test",
     "lsp": "cargo run -p cooked_lsp --bin cooked-lsp",
     "lsp:build": "cargo build -p cooked_lsp --bin cooked-lsp",
     "test": "pnpm -r test",
-    "example": "pnpm --filter @cooked/example-counter dev"
+    "example": "pnpm --filter @cookedjs/example-counter dev"
   },
   "devDependencies": {
     "typescript": "^5.7.2"

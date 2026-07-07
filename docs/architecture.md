@@ -12,7 +12,7 @@ runtime.
        jsx/codegen -> document.createElement + runtime helpers
        |
        v
-   cooked_napi -> @cooked/binding
+   cooked_napi -> @cookedjs/binding
        |
        v
    vite-plugin-cooked
@@ -36,7 +36,7 @@ The compiler rewrites:
 ## Binding
 
 [`crates/cooked_napi`](../crates/cooked_napi) exposes the Rust compiler to
-JavaScript as `@cooked/binding`.
+JavaScript as `@cookedjs/binding`.
 
 ## Runtime
 

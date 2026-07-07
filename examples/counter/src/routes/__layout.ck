@@ -1,4 +1,4 @@
-import { Link } from "cooked/router"
+import { Link } from "@cookedjs/cooked/router"
 
 export fn Layout() {
   rt (

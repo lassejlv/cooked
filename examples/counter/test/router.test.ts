@@ -1,6 +1,6 @@
 import { test, expect } from "vitest";
-import { mount } from "cooked";
-import { createRouter, navigate } from "cooked/router";
+import { mount } from "@cookedjs/cooked";
+import { createRouter, navigate } from "@cookedjs/cooked/router";
 import { routes } from "virtual:cooked-routes";
 
 const tick = () => new Promise<void>((r) => setTimeout(r, 0));

@@ -25,7 +25,7 @@ export fn Counter() {
 Use `createStore` for shared app state:
 
 ```ts
-import { createStore, createActions } from "cooked";
+import { createStore, createActions } from "@cookedjs/cooked";
 
 export const counter = createStore({ count: 0, label: "Cooked" });
 
@@ -66,7 +66,7 @@ accessor only update when that slice changes.
 state outside `.ck` files:
 
 ```ts
-import { atom } from "cooked";
+import { atom } from "@cookedjs/cooked";
 
 const open = atom(false);
 open.set(true);

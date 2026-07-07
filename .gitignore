@@ -17,3 +17,5 @@ crates/cooked_napi/index.d.ts
 .DS_Store
 *.log
 editors/zed/target
+editors/zed/grammars
+editors/zed/extension.wasm

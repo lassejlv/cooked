@@ -9,7 +9,7 @@ use crate::jsx::js_string;
 use crate::rewrite::{rewrite_expr, rewrite_ts, Kind, SymbolMap};
 
 pub fn gen_module(file: &File, filename: &str) -> Result<String, String> {
-    let mut out = String::from("import * as $ from \"cooked\";\n");
+    let mut out = String::from("import * as $ from \"@cookedjs/cooked\";\n");
     for imp in &file.imports {
         out.push_str(imp);
         out.push_str(";\n");
@@ -17,6 +17,14 @@ pub fn gen_module(file: &File, filename: &str) -> Result<String, String> {
     out.push('\n');
     for f in &file.functions {
         out.push_str(&gen_raw_fn(f).map_err(|e| format!("fn {}: {}", f.name, e))?);
+        out.push('\n');
+    }
+    for raw in &file.raws {
+        // Strip TypeScript from the pass-through statement (annotations in
+        // validators etc.) — the emitted module is plain JS.
+        let js = rewrite_ts(raw, &SymbolMap::default())
+            .map_err(|e| format!("export statement: {}", e))?;
+        out.push_str(js.trim_end());
         out.push('\n');
     }
     for comp in &file.components {
@@ -106,8 +114,9 @@ fn gen_component(comp: &Component) -> Result<String, String> {
                 rewrite_expr(&c.expr, &map)?
             )),
             Item::Fn(f) => b.push_str(&format!(
-                "  const {} = ({}) => {{ {} }};\n",
+                "  const {} = {}({}) => {{ {} }};\n",
                 f.name,
+                if f.is_async { "async " } else { "" },
                 strip_params(&f.params),
                 rewrite_ts(&f.body, &map)?
             )),

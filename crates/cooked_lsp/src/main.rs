@@ -912,7 +912,7 @@ mod tests {
         }
         let layout = root.join("src/routes/__layout.ck");
         let uri = Url::from_file_path(&layout).unwrap();
-        let text = "import { Link } from \"cooked/router\"\n\nexport fn Layout() {\n  rt (\n    <nav>\n      <Link to=\"/nope\">bad</Link>\n    </nav>\n  )\n}\n";
+        let text = "import { Link } from \"@cookedjs/cooked/router\"\n\nexport fn Layout() {\n  rt (\n    <nav>\n      <Link to=\"/nope\">bad</Link>\n    </nav>\n  )\n}\n";
         let diagnostics = typescript_diagnostics(&uri, text).await;
         assert!(
             diagnostics

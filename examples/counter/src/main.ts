@@ -1,6 +1,6 @@
 import "./style.css";
-import { mount } from "cooked";
-import { createRouter } from "cooked/router";
+import { mount } from "@cookedjs/cooked";
+import { createRouter } from "@cookedjs/cooked/router";
 import { routes } from "virtual:cooked-routes";
 
 const app = document.getElementById("app");

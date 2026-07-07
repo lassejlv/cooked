@@ -1,6 +1,6 @@
 {
-  "name": "cooked",
-  "version": "0.0.1",
+  "name": "@cookedjs/cooked",
+  "version": "0.1.0",
   "description": "Runtime for the Cooked language: fine-grained signals + DOM helpers.",
   "type": "module",
   "main": "./dist/index.js",
@@ -18,17 +18,48 @@
     "./router": {
       "types": "./dist/router.d.ts",
       "default": "./dist/router.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    },
+    "./fn": {
+      "types": "./dist/fn.d.ts",
+      "default": "./dist/fn.js"
+    },
+    "./fn-client": {
+      "types": "./dist/fn-client.d.ts",
+      "default": "./dist/fn-client.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "test:watch": "vitest"
   },
+  "dependencies": {
+    "happy-dom": "^15.11.6"
+  },
   "devDependencies": {
-    "happy-dom": "^15.11.6",
+    "@types/node": "^22.10.0",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
-  }
+  },
+  "license": "MIT",
+  "author": "Lasse Vestergaard",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cookedjs/cooked"
+  },
+  "keywords": [
+    "cooked",
+    "compiler",
+    "reactive",
+    "vite",
+    "ssr",
+    "framework"
+  ]
 }

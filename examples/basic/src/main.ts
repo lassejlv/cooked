@@ -1,4 +1,4 @@
-import { mount } from "cooked";
+import { mount } from "@cookedjs/cooked";
 import { App } from "./main.ck";
 
 const app = document.getElementById("app");

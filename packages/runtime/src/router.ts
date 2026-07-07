@@ -37,7 +37,7 @@ export interface RouteDefinition {
 /**
  * Augmented by the generated `cooked-routes.d.ts`:
  *
- *   declare module "cooked/router" {
+ *   declare module "@cookedjs/cooked/router" {
  *     interface Register {
  *       routes: {
  *         "/": { params: Record<string, never> };
@@ -161,6 +161,18 @@ function matchRoute(routes: CompiledRoute[], pathname: string): Match | null {
   return null;
 }
 
+/**
+ * Match a pathname against route definitions, best match first. Used by the
+ * SSR server for API routes; also handy for custom servers.
+ */
+export function matchRoutes(
+  routes: RouteDefinition[],
+  pathname: string,
+): { route: RouteDefinition; params: Record<string, string> } | null {
+  const match = matchRoute(compileRoutes(routes), pathname);
+  return match ? { route: match.route.definition, params: match.params } : null;
+}
+
 /* ------------------------------------------------------------------ */
 /* Router state                                                        */
 /* ------------------------------------------------------------------ */
@@ -177,7 +189,7 @@ interface RouterState {
 let active: RouterState | null = null;
 
 function requireRouter(): RouterState {
-  if (!active) throw new Error("cooked/router: no router created — call createRouter() first");
+  if (!active) throw new Error("@cookedjs/cooked/router: no router created — call createRouter() first");
   return active;
 }
 
@@ -202,7 +214,7 @@ export function buildHref(
         const name = part.slice(1);
         const value = params?.[name];
         if (value === undefined) {
-          throw new Error(`cooked/router: missing param "${name}" for "${to}"`);
+          throw new Error(`@cookedjs/cooked/router: missing param "${name}" for "${to}"`);
         }
         return encodeURIComponent(value);
       }
@@ -258,10 +270,16 @@ export function usePathname(): { get(): string } {
 
 function pickComponent(mod: RouteModule, file: string): Component {
   if (typeof mod.default === "function") return mod.default as Component;
-  const fns = Object.entries(mod).filter(([, v]) => typeof v === "function");
+  // Components are capitalized by convention; this also skips server
+  // functions (and their client stubs) exported from the same route file.
+  const isComponent = ([name, value]: [string, unknown]) =>
+    typeof value === "function" &&
+    /^[A-Z]/.test(name) &&
+    (value as { __cookedServerFn?: unknown }).__cookedServerFn !== true;
+  const fns = Object.entries(mod).filter(isComponent);
   if (fns.length === 1) return fns[0][1] as Component;
   throw new Error(
-    `cooked/router: route module "${file}" must have a default export or exactly one exported component (found ${fns.length})`,
+    `@cookedjs/cooked/router: route module "${file}" must have a default export or exactly one exported (capitalized) component (found ${fns.length})`,
   );
 }
 
@@ -299,6 +317,8 @@ export interface Router {
   /** Component rendering the matched route (wrapped in its layouts). Pass to `mount`. */
   view: Component;
   navigate: typeof navigate;
+  /** The currently matched route pattern and params, or null (reactive). */
+  current(): { path: string; params: Record<string, string> } | null;
   /** Remove the popstate listener and detach the router. */
   dispose(): void;
 }
@@ -384,22 +404,27 @@ export function createRouter(options: RouterOptions): Router {
       const loaders = [...(m.route.definition.layouts ?? []), m.route.definition.load];
       const loaded = Promise.all(loaders.map((load) => load()));
       loaded.catch((error) => {
-        console.error(`cooked/router: failed to load route "${m.route.definition.path}"`, error);
+        console.error(`@cookedjs/cooked/router: failed to load route "${m.route.definition.path}"`, error);
       });
       void loaded.then((mods) => {
         if (t !== token) return;
         clear();
-        createRoot((dispose) => {
-          disposePrev = dispose;
-          const leaf = pickComponent(mods[mods.length - 1], m.route.definition.path);
-          let node = leaf({ params: m.params });
-          for (let i = mods.length - 2; i >= 0; i--) {
-            const layout = pickComponent(mods[i], `layout of ${m.route.definition.path}`);
-            node = layout({ children: node });
-          }
-          if (isThenable(node)) void node.then((n) => show(t, n));
-          else show(t, node);
-        });
+        try {
+          createRoot((dispose) => {
+            disposePrev = dispose;
+            const leaf = pickComponent(mods[mods.length - 1], m.route.definition.path);
+            let node = leaf({ params: m.params });
+            for (let i = mods.length - 2; i >= 0; i--) {
+              const layout = pickComponent(mods[i], `layout of ${m.route.definition.path}`);
+              node = layout({ children: node });
+            }
+            if (isThenable(node)) void node.then((n) => show(t, n));
+            else show(t, node);
+          });
+        } catch (error) {
+          // A broken route must not take the app (or the SSR process) down.
+          console.error(`@cookedjs/cooked/router: failed to render "${m.route.definition.path}"`, error);
+        }
       });
     });
 
@@ -409,6 +434,10 @@ export function createRouter(options: RouterOptions): Router {
   return {
     view,
     navigate,
+    current() {
+      const m = matched.get();
+      return m ? { path: m.route.definition.path, params: m.params } : null;
+    },
     dispose() {
       removeEventListener("popstate", onPopState);
       if (active === state) active = null;

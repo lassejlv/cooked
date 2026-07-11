@@ -14,7 +14,7 @@
     "lsp": "cargo run -p cooked_lsp --bin cooked-lsp",
     "lsp:build": "cargo build -p cooked_lsp --bin cooked-lsp",
     "test": "pnpm -r test",
-    "example": "pnpm --filter @cookedjs/example-counter dev"
+    "example": "pnpm build:runtime && pnpm build:plugin && pnpm --filter @cookedjs/example-counter dev"
   },
   "devDependencies": {
     "typescript": "^5.7.2"

@@ -1,6 +1,6 @@
 {
   "name": "@cookedjs/vite-plugin-cooked",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Vite plugin for the Cooked language (.ck).",
   "type": "module",
   "main": "./dist/index.js",

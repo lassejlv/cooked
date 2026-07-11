@@ -12,7 +12,7 @@
     "@cookedjs/cooked": "^0.1.0"
   },
   "devDependencies": {
-    "@cookedjs/vite-plugin-cooked": "^0.1.0",
+    "@cookedjs/vite-plugin-cooked": "^0.1.1",
     "typescript": "^5.7.2",
     "vite": "^6.0.3"
   }
